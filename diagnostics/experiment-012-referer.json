@@ -1,0 +1,40 @@
+{
+  "experiment": 12,
+  "name": "CDN Referer Test",
+  "testedAt": "2026-11-01T16:56:02.702Z",
+  "imageUrl": "https://zjcdn.mangahere.org/store/manga/29855/001.0/compressed/d001.jpg",
+  "results": {
+    "noReferer": {
+      "status": 403,
+      "contentType": "text/html; charset=UTF-8",
+      "contentLength": 4550,
+      "server": "cloudflare",
+      "cfRay": "a53c6e0ebc8e93a1-MRS",
+      "bodyPreview": "<!DOCTYPE html>.<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->.<!--[if IE 7]>    <html class=\"no-js ie7 oldie\" lang=\"en-US\"> <![endif]-->.<!--[if IE 8]>    <html class=\"no-"
+    },
+    "chapterReferer": {
+      "status": 200,
+      "contentType": "image/jpeg",
+      "contentLength": "121399",
+      "server": "cloudflare",
+      "cfRay": "a53c6e12b81e93a1-MRS",
+      "bodyPreview": "......JFIF.............C.....................................%...#... , #&')*)..-0-(0%()(...C...........(...((((((((((((((((((((((((((((((((((((((((((((((((((...........\".............................."
+    },
+    "rootReferer": {
+      "status": 200,
+      "contentType": "image/jpeg",
+      "contentLength": "121399",
+      "server": "cloudflare",
+      "cfRay": "a53c6e1d997793a1-MRS",
+      "bodyPreview": "......JFIF.............C.....................................%...#... , #&')*)..-0-(0%()(...C...........(...((((((((((((((((((((((((((((((((((((((((((((((((((...........\".............................."
+    },
+    "mobileReferer": {
+      "status": 200,
+      "contentType": "image/jpeg",
+      "contentLength": "121399",
+      "server": "cloudflare",
+      "cfRay": "a53c6e28dc9e93a1-MRS",
+      "bodyPreview": "......JFIF.............C.....................................%...#... , #&')*)..-0-(0%()(...C...........(...((((((((((((((((((((((((((((((((((((((((((((((((((...........\".............................."
+    }
+  }
+}

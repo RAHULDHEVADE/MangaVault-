@@ -1,0 +1,167 @@
+{
+  "experiment": 13,
+  "name": "Page Downloader",
+  "testedAt": "2026-11-01T17:00:53.123Z",
+  "title": "Sweet Home",
+  "chapter": "001",
+  "totalPages": 21,
+  "successCount": 14,
+  "failCount": 7,
+  "outputDir": "uploads/sweet_home_c001",
+  "results": [
+    {
+      "pageNumber": 1,
+      "filename": "d001.jpg",
+      "success": true,
+      "status": 200,
+      "size": 121399,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 2,
+      "filename": "d002.jpg",
+      "success": true,
+      "status": 200,
+      "size": 312320,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 3,
+      "filename": "d003.jpg",
+      "success": true,
+      "status": 200,
+      "size": 362832,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 4,
+      "filename": "d004.jpg",
+      "success": false,
+      "error": "read ECONNABORTED"
+    },
+    {
+      "pageNumber": 5,
+      "filename": "d005.jpg",
+      "success": true,
+      "status": 200,
+      "size": 391169,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 6,
+      "filename": "d006.jpg",
+      "success": true,
+      "status": 200,
+      "size": 429694,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 7,
+      "filename": "d007.jpg",
+      "success": true,
+      "status": 200,
+      "size": 358478,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 8,
+      "filename": "d008.jpg",
+      "success": true,
+      "status": 200,
+      "size": 342755,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 9,
+      "filename": "d009.jpg",
+      "success": true,
+      "status": 200,
+      "size": 290383,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 10,
+      "filename": "d010.jpg",
+      "success": true,
+      "status": 200,
+      "size": 263731,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 11,
+      "filename": "d011.jpg",
+      "success": true,
+      "status": 200,
+      "size": 494199,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 12,
+      "filename": "d012.jpg",
+      "success": true,
+      "status": 200,
+      "size": 460116,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 13,
+      "filename": "d013.jpg",
+      "success": true,
+      "status": 200,
+      "size": 365346,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 14,
+      "filename": "d014.jpg",
+      "success": true,
+      "status": 200,
+      "size": 379049,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 15,
+      "filename": "d015.jpg",
+      "success": true,
+      "status": 200,
+      "size": 470758,
+      "contentType": "image/jpeg"
+    },
+    {
+      "pageNumber": 16,
+      "filename": "d016.jpg",
+      "success": false,
+      "error": "read ECONNABORTED"
+    },
+    {
+      "pageNumber": 17,
+      "filename": "d017.jpg",
+      "success": false,
+      "error": "getaddrinfo ENOTFOUND zjcdn.mangahere.org"
+    },
+    {
+      "pageNumber": 18,
+      "filename": "d018.jpg",
+      "success": false,
+      "error": "getaddrinfo ENOTFOUND zjcdn.mangahere.org"
+    },
+    {
+      "pageNumber": 19,
+      "filename": "d019.jpg",
+      "success": false,
+      "error": "getaddrinfo ENOTFOUND zjcdn.mangahere.org"
+    },
+    {
+      "pageNumber": 20,
+      "filename": "d020.jpg",
+      "success": false,
+      "error": "getaddrinfo ENOTFOUND zjcdn.mangahere.org"
+    },
+    {
+      "pageNumber": 21,
+      "filename": "d021.jpg",
+      "success": false,
+      "error": "getaddrinfo ENOTFOUND zjcdn.mangahere.org"
+    }
+  ]
+}

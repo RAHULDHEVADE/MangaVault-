@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Uploaded files (PDFs, images, covers)
+uploads/
+
+# Backups, logs, and old patches
+*.pdf
+*.zip
+server.before-*.js
+index.before-*.html
+*.bak
+*.log
+
+# Secrets
+gcs-key.json
+.env
