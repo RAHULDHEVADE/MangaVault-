@@ -322,43 +322,40 @@ if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
     let folderName = null;
     let previousManifest = null;
 
+    // Find an existing manifest for this exact URL
     if (fs.existsSync(dbDir)) {
       for (const file of fs.readdirSync(dbDir)) {
         if (!file.endsWith(".json")) continue;
-        
-        const chapterId = file.replace(/\.json$/, "");
         const manifestPath = path.join(dbDir, file);
-        
         try {
           const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-          const pdfName = path.basename(manifest.pdf || "");
-          if (!pdfName || !pdfName.endsWith(".pdf")) continue;
-
-          const pdfPath = path.join(uploadsDir, pdfName);
-          if (!fs.existsSync(pdfPath) || seen.has(pdfName)) continue;
-
-          // Parse metadata directly from the manifest
-          const seriesTitle = manifest.seriesTitle || "Unknown Manga";
-          const chapterName = manifest.chapter || "Chapter";
-          const seriesKey = manifest.seriesSlug || seriesTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-
-          chapters.push({
-            id: chapterId,
-            title: seriesTitle,
-            seriesKey: seriesKey,
-            chapter: chapterName,
-            pages: manifest.downloaded || manifest.totalPages || 0,
-            createdAt: manifest.createdAt || fs.statSync(pdfPath).mtime.toISOString(),
-            pdf: "/uploads/" + pdfName
-          });
-          seen.add(pdfName);
-        } catch (err) {
-          console.error("[LIBRARY] Skipped invalid manifest:", file);
-        }
+          if (manifest.source === normalizedUrl) {
+            // Check if the PDF actually exists
+            const pdfName = path.basename(manifest.pdf || "");
+            const pdfPath = path.join(uploadsDir, pdfName);
+            if (pdfName && fs.existsSync(pdfPath)) {
+              previousManifest = manifest;
+              folderName = file.replace(/\.json$/, "");
+              console.log("[IMPORT] Found existing chapter, skipping download");
+              break;
+            }
+          }
+        } catch (e) { /* skip bad json */ }
       }
     }
 
-    if (!folderName) folderName = "chapter_" + Date.now();
+    // If this chapter is already fully downloaded, skip it
+    if (previousManifest) {
+      return res.json({
+        success: true,
+        message: "Chapter already exists. Skipped.",
+        pdf: previousManifest.pdf,
+        pages: previousManifest.downloaded || 0,
+        total: previousManifest.totalPages || 0
+      });
+    }
+
+    if (!folderName) folderName = "chapter_" + Date.now();    if (!folderName) folderName = "chapter_" + Date.now();
 
     const imageDir = path.join(uploadsDir, folderName);
     fs.mkdirSync(imageDir, { recursive: true });
