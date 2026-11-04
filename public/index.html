@@ -420,7 +420,7 @@
       <a class="active" href="#">⌂ &nbsp;Home</a>
       <a href="#library">▣ &nbsp;Library</a>
       <a href="#analysis">♧ &nbsp;Analysis</a>
-      <a href="#tools">⚒ &nbsp;Tools</a>
+      <a href="#arcade">🎮 &nbsp;Arcade</a>
     </nav>
     <div class="nav-tools">
       <button class="icon-btn" aria-label="Search" onclick="showToast('Search is coming soon')">⌕</button>
@@ -550,7 +550,7 @@
   </div>
 
   <nav class="mobile-nav">
-    <a href="#"><span>⌂</span>Home</a><a href="#library"><span>▣</span>Library</a><a href="#import"><span>↓</span>Import</a><a href="#analysis"><span>▥</span>Analysis</a><a href="#tools"><span>⚒</span>Tools</a>
+    <a href="#"><span>⌂</span>Home</a><a href="#library"><span>▣</span>Library</a><a href="#import"><span>↓</span>Import</a><a href="#analysis"><span>▥</span>Analysis</a><a href="#arcade"><span>🎮</span>Arcade</a>
   </nav>
   <div class="toast" id="toast"></div>
 
@@ -1025,5 +1025,28 @@
     };
 </script>
 
+
+  <!-- MangaVault Arcade -->
+<section id="arcade" style="display:none; flex-direction:column; padding:16px; margin-top:16px; max-width:900px; margin-left:auto; margin-right:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 style="margin:0; font-size:24px; color:#fff;">🎮 Typing Ninja</h2>
+        <span id="arcadeNinjaScore" style="font-size:16px; color:#4ade80; font-weight:bold;">Score: 0</span>
+    </div>
+
+    <div id="arcadeNinjaArena" style="height:320px; position:relative; background:#0a0512; border-radius:12px; overflow:hidden; border:1px solid rgba(138,43,226,0.4);"></div>
+
+    <input
+        id="arcadeNinjaInput"
+        type="text"
+        placeholder="Type the falling word..."
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="characters"
+        spellcheck="false"
+        style="width:100%; margin-top:12px; padding:14px 16px; border-radius:12px; background:rgba(0,0,0,0.5); color:white; border:1px solid rgba(138,43,226,0.4); box-sizing:border-box; outline:none; font-family:monospace; font-size:16px;"
+    />
+</section>
+
+<script src="/game.js"></script>
 </body>
 </html>
