@@ -521,6 +521,12 @@
         </div>
 
         <div id="queueGameActive" style="display:none;margin-top:14px;">
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <button id="queueBtnNinja" class="arcade-tab active" type="button" onclick="switchQueueGame('ninja')">🥷 Typing Ninja</button>
+            <button id="queueBtnRunner" class="arcade-tab" type="button" onclick="switchQueueGame('runner')">🏃 Dodge Deadline</button>
+          </div>
+          <div id="queueGameNinjaPanel">
+
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:nowrap;">
             <strong style="color:#d8a2ff;font-size:14px;white-space:nowrap;">🥷 Typing Ninja</strong>
             <span id="queueNinjaScore" style="color:#4ade80;font-weight:bold;font-size:14px;white-space:nowrap;">Score: 0</span>
@@ -528,6 +534,16 @@
           </div>
           <div id="queueNinjaArena" class="game-arena" style="height:220px;background:#0a0512 url('/assets/typing-bg.png') center/cover no-repeat;"></div>
           <input id="queueNinjaInput" class="ninja-input" type="text" placeholder="Type the falling word..." autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+          
+          </div>
+          <div id="queueGameRunnerPanel" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+              <strong style="color:#d8a2ff;font-size:14px;">🏃 Dodge Deadline</strong>
+              <span id="queueRunnerScore" style="color:#4ade80;font-weight:bold;">Score: 0</span>
+            </div>
+            <div id="queueRunnerArena" class="game-arena" style="height:220px;background:#080512 url('/assets/runner-bg.png') center/cover no-repeat;touch-action:manipulation;"></div>
+            <p style="margin:7px 0;color:#aaa;font-size:12px;text-align:center;">Tap the arena or press Space to jump</p>
+          </div>
           <button type="button" onclick="stopQueueGame()" style="margin-top:10px;padding:8px 14px;border-radius:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;">Exit Game</button>
         </div>
       </div>
