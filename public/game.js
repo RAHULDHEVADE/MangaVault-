@@ -576,3 +576,358 @@ document.addEventListener("DOMContentLoaded", handleArcadeNavigation);
 
 handleArcadeNavigation();
 
+
+// =====================================================
+// MANGAVAULT — QUEUE TYPING NINJA
+// Independent instance. Does not share Arcade Ninja state.
+// =====================================================
+
+const queueNinjaState = {
+    active: false,
+    words: [],
+    projectiles: new Set(),
+    score: 0,
+    lives: 3,
+    spawnTimer: null,
+    fallTimer: null
+};
+
+function setupQueueNinja() {
+    const arena = document.getElementById("queueNinjaArena");
+    const input = document.getElementById("queueNinjaInput");
+    const score = document.getElementById("queueNinjaScore");
+    const lives = document.getElementById("queueNinjaLives");
+
+    if (!arena || !input || !score || !lives) {
+        console.error("Queue Ninja: Required elements missing");
+        return null;
+    }
+
+    arena.style.position = "relative";
+    arena.style.overflow = "hidden";
+
+    return { arena, input, score, lives };
+}
+
+function updateQueueNinjaHUD() {
+    const score = document.getElementById("queueNinjaScore");
+    const lives = document.getElementById("queueNinjaLives");
+
+    if (score) score.textContent = "Score: " + queueNinjaState.score;
+    if (lives) {
+        lives.textContent =
+            "❤️".repeat(queueNinjaState.lives) +
+            "🖤".repeat(3 - queueNinjaState.lives);
+    }
+}
+
+function spawnQueueNinjaWord() {
+    const state = queueNinjaState;
+    if (!state.active) return;
+
+    const arena = document.getElementById("queueNinjaArena");
+    if (!arena) return;
+
+    const word = arcadeWordList[
+        Math.floor(Math.random() * arcadeWordList.length)
+    ];
+
+    const element = document.createElement("div");
+    element.textContent = word;
+    element.dataset.word = word;
+    element.dataset.top = "0";
+    element.dataset.targeted = "false";
+
+    element.style.cssText = `
+        position:absolute;top:0;left:0;padding:8px 14px;
+        background:white;color:#111;border:2px solid #171020;
+        border-radius:12px;font-family:"Comic Sans MS",cursive;
+        font-size:16px;font-weight:bold;letter-spacing:1px;
+        white-space:nowrap;box-shadow:4px 4px 0 #8b35d5,
+        0 0 14px rgba(190,100,255,.5);z-index:10;
+    `;
+
+    arena.appendChild(element);
+
+    const maxLeft = Math.max(0, arena.clientWidth - element.offsetWidth - 8);
+    element.style.left = Math.round(Math.random() * maxLeft) + "px";
+    state.words.push(element);
+}
+
+function createQueueNinjaImpact(x, y) {
+    const arena = document.getElementById("queueNinjaArena");
+    if (!arena) return;
+
+    const impact = document.createElement("div");
+    impact.className = "ninja-impact";
+    impact.style.left = (x - 24) + "px";
+    impact.style.top = (y - 24) + "px";
+    arena.appendChild(impact);
+
+    setTimeout(() => impact.remove(), 280);
+}
+
+function launchQueueNinjaShuriken(target) {
+    const state = queueNinjaState;
+    const arena = document.getElementById("queueNinjaArena");
+
+    if (!state.active || !arena || !target) return;
+    if (target.dataset.targeted === "true") return;
+
+    target.dataset.targeted = "true";
+
+    const size = 32;
+    const offset = size / 2;
+    const startX = arena.clientWidth / 2;
+    const startY = arena.clientHeight - 26;
+    const endX = target.offsetLeft + target.offsetWidth / 2;
+    const endY = target.offsetTop + target.offsetHeight / 2;
+
+    const shuriken = document.createElement("img");
+    shuriken.src = "/assets/shuriken.png";
+    shuriken.alt = "";
+    shuriken.style.cssText = `
+        position:absolute;width:${size}px;height:${size}px;
+        left:${startX - offset}px;top:${startY - offset}px;
+        z-index:9999;pointer-events:none;object-fit:contain;
+        filter:drop-shadow(0 0 5px #b44cff);
+    `;
+    arena.appendChild(shuriken);
+
+    const projectile = { element: shuriken, raf: null };
+    state.projectiles.add(projectile);
+
+    const started = performance.now();
+    const duration = 280;
+
+    function animate(now) {
+        if (!state.active) {
+            shuriken.remove();
+            state.projectiles.delete(projectile);
+            return;
+        }
+
+        const progress = Math.min((now - started) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 2);
+        const x = startX + (endX - startX) * eased;
+        const y = startY + (endY - startY) * eased;
+
+        shuriken.style.left = (x - offset) + "px";
+        shuriken.style.top = (y - offset) + "px";
+        shuriken.style.transform = `rotate(${1080 * progress}deg)`;
+
+        if (progress < 1) {
+            projectile.raf = requestAnimationFrame(animate);
+            return;
+        }
+
+        shuriken.remove();
+        state.projectiles.delete(projectile);
+
+        if (!state.active) return;
+
+        createQueueNinjaImpact(endX, endY);
+
+        const index = state.words.indexOf(target);
+        if (index !== -1) state.words.splice(index, 1);
+
+        target.classList.add("ninja-word-pop");
+        state.score += 10;
+        updateQueueNinjaHUD();
+
+        setTimeout(() => target.remove(), 200);
+    }
+
+    projectile.raf = requestAnimationFrame(animate);
+}
+
+function fallQueueNinjaWords() {
+    const state = queueNinjaState;
+    if (!state.active) return;
+
+    const arena = document.getElementById("queueNinjaArena");
+    if (!arena) return;
+
+    for (let i = state.words.length - 1; i >= 0; i--) {
+        const word = state.words[i];
+        if (word.dataset.targeted === "true") continue;
+
+        const top = Number(word.dataset.top) + 2;
+        word.dataset.top = String(top);
+        word.style.top = top + "px";
+
+        if (top + word.offsetHeight >= arena.clientHeight) {
+            word.remove();
+            state.words.splice(i, 1);
+            state.lives = Math.max(0, state.lives - 1);
+            updateQueueNinjaHUD();
+
+            if (state.lives === 0) {
+                endQueueNinja();
+                return;
+            }
+        }
+    }
+}
+
+function clearQueueNinjaProjectiles() {
+    const state = queueNinjaState;
+
+    for (const projectile of state.projectiles) {
+        if (projectile.raf !== null) cancelAnimationFrame(projectile.raf);
+        projectile.element.remove();
+    }
+
+    state.projectiles.clear();
+}
+
+function endQueueNinja() {
+    const state = queueNinjaState;
+    if (!state.active) return;
+
+    state.active = false;
+    clearInterval(state.spawnTimer);
+    clearInterval(state.fallTimer);
+    state.spawnTimer = null;
+    state.fallTimer = null;
+
+    clearQueueNinjaProjectiles();
+    state.words.forEach(word => word.remove());
+    state.words = [];
+
+    const arena = document.getElementById("queueNinjaArena");
+    const input = document.getElementById("queueNinjaInput");
+
+    if (input) {
+        input.disabled = true;
+        input.value = "";
+    }
+    if (!arena) return;
+
+    const overlay = document.createElement("div");
+    overlay.className = "ninja-game-over queue-ninja-game-over";
+    overlay.style.cssText = `
+        position:absolute;
+        inset:0;
+        z-index:10000;
+        display:flex;
+        flex-direction:column;
+        justify-content:center;
+        align-items:center;
+        gap:7px;
+        padding:8px;
+        box-sizing:border-box;
+        overflow:hidden;
+        background:rgba(8,3,20,.94);
+        color:white;
+        text-align:center;
+        border-radius:12px;
+    `;
+
+    overlay.innerHTML = `
+        <div style="font-size:30px;line-height:1;">💀</div>
+        <h2 style="font-size:23px;margin:0;color:#d8a2ff;">GAME OVER</h2>
+        <p style="font-size:14px;margin:3px 0 5px;">
+            Final Score: <strong>${state.score}</strong>
+        </p>
+        <button class="ninja-retry" type="button"
+            style="padding:8px 22px;font-size:14px;">
+            ↻ Retry
+        </button>
+    `;
+
+    arena.appendChild(overlay);
+    overlay.querySelector(".ninja-retry").addEventListener(
+        "click", startQueueNinja
+    );
+}
+function startQueueNinja() {
+    const state = queueNinjaState;
+    if (state.active) return;
+
+    const elements = setupQueueNinja();
+    if (!elements) return;
+
+    const { arena, input, score } = elements;
+
+    clearInterval(state.spawnTimer);
+    clearInterval(state.fallTimer);
+    clearQueueNinjaProjectiles();
+
+    state.words.forEach(word => word.remove());
+    state.words = [];
+
+    const oldOverlay = arena.querySelector(".ninja-game-over");
+    if (oldOverlay) oldOverlay.remove();
+
+    state.score = 0;
+    state.lives = 3;
+    state.active = true;
+    score.textContent = "Score: 0";
+    input.disabled = false;
+    input.value = "";
+    updateQueueNinjaHUD();
+
+    input.oninput = function () {
+        if (!state.active) return;
+        const value = input.value.toUpperCase().trim();
+        if (!value) return;
+
+        const target = state.words.find(word =>
+            word.dataset.word === value &&
+            word.dataset.targeted !== "true"
+        );
+
+        if (target) {
+            launchQueueNinjaShuriken(target);
+            input.value = "";
+        }
+    };
+
+    spawnQueueNinjaWord();
+    state.spawnTimer = setInterval(spawnQueueNinjaWord, 1600);
+    state.fallTimer = setInterval(fallQueueNinjaWords, 50);
+    setTimeout(() => {
+        if (state.active) input.focus();
+    }, 100);
+}
+
+function startQueueGame() {
+    const startScreen = document.getElementById("queueGameStartScreen");
+    const activeArea = document.getElementById("queueGameActive");
+
+    if (!startScreen || !activeArea) return;
+
+    startScreen.style.display = "none";
+    activeArea.style.display = "block";
+    startQueueNinja();
+}
+
+function stopQueueGame() {
+    const state = queueNinjaState;
+    state.active = false;
+
+    clearInterval(state.spawnTimer);
+    clearInterval(state.fallTimer);
+    state.spawnTimer = null;
+    state.fallTimer = null;
+
+    clearQueueNinjaProjectiles();
+    state.words.forEach(word => word.remove());
+    state.words = [];
+
+    const input = document.getElementById("queueNinjaInput");
+    const activeArea = document.getElementById("queueGameActive");
+    const startScreen = document.getElementById("queueGameStartScreen");
+
+    if (input) {
+        input.value = "";
+        input.disabled = false;
+    }
+    if (activeArea) activeArea.style.display = "none";
+    if (startScreen) startScreen.style.display = "block";
+}
+
+window.startQueueGame = startQueueGame;
+window.startQueueNinja = startQueueNinja;
+window.stopQueueGame = stopQueueGame;

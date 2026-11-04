@@ -409,6 +409,7 @@
     }
     
   </style>
+  <link rel="stylesheet" href="/game.css">
 </head>
 <body>
   <header class="topbar">
@@ -503,6 +504,34 @@
         <div id="queueList"></div>
       </div>
         <p class="hint" id="importHint">Only sources and content that permit downloading will be supported.</p>
+      <div id="queueGameCard" style="margin-top:24px;padding:16px;background:rgba(15,8,30,.85);border:1px solid rgba(138,43,226,.35);border-radius:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div>
+            <h3 style="margin:0;color:#d8a2ff;">🎮 MangaVault Mini Games</h3>
+            <p style="margin:5px 0 0;color:#aaa;font-size:12px;">Take a break between chapters.</p>
+          </div>
+          <span style="color:#b88aff;font-size:12px;">QUEUE ARCADE</span>
+        </div>
+
+        <div id="queueGameStartScreen" style="margin-top:16px;text-align:center;padding:24px 12px;background:rgba(0,0,0,.3);border-radius:12px;">
+          <div style="font-size:42px;">🥷</div>
+          <h3 style="color:white;margin:8px 0;">Typing Ninja</h3>
+          <p style="color:#aaa;font-size:13px;">Type the falling manga words. Launch shurikens and protect your 3 lives!</p>
+          <button type="button" onclick="startQueueGame()" style="background:#8425dc;color:white;border:1px solid #c58aff;border-radius:10px;padding:12px 28px;font-weight:bold;font-size:15px;">▶ Start Game</button>
+        </div>
+
+        <div id="queueGameActive" style="display:none;margin-top:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:nowrap;">
+            <strong style="color:#d8a2ff;font-size:14px;white-space:nowrap;">🥷 Typing Ninja</strong>
+            <span id="queueNinjaScore" style="color:#4ade80;font-weight:bold;font-size:14px;white-space:nowrap;">Score: 0</span>
+            <span id="queueNinjaLives" style="font-size:15px;white-space:nowrap;letter-spacing:-2px;">❤️❤️❤️</span>
+          </div>
+          <div id="queueNinjaArena" class="game-arena" style="height:220px;background:#0a0512 url('/assets/typing-bg.png') center/cover no-repeat;"></div>
+          <input id="queueNinjaInput" class="ninja-input" type="text" placeholder="Type the falling word..." autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+          <button type="button" onclick="stopQueueGame()" style="margin-top:10px;padding:8px 14px;border-radius:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;">Exit Game</button>
+        </div>
+      </div>
+
       </section>
 
       <section class="stats" id="analysis">
