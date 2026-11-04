@@ -363,35 +363,54 @@ if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
     let ok = 0;
     const failedPages = [];
 
-    for (const p of pages) {
-      const savePath = path.join(imageDir, p.filename);
+    // Four concurrent workers; PDF generation waits for all workers.
+    const DOWNLOAD_CONCURRENCY = 4;
+    let nextPageIndex = 0;
 
-      // Skip an image that is already present and looks valid.
-      if (fs.existsSync(savePath) && fs.statSync(savePath).size >= 1000) {
-        ok++;
-        p.status = "downloaded";
-        p.size = fs.statSync(savePath).size;
-        console.log("[IMPORT] Already have " + p.filename + " — skipped");
-        continue;
+    async function downloadWorker() {
+      while (true) {
+        const index = nextPageIndex++;
+        if (index >= pages.length) return;
+
+        const page = pages[index];
+        const savePath = path.join(imageDir, page.filename);
+
+        try {
+          if (fs.existsSync(savePath) && fs.statSync(savePath).size >= 1000) {
+            ok++;
+            page.status = "downloaded";
+            page.size = fs.statSync(savePath).size;
+            console.log("[IMPORT] Already have " + page.filename + " — skipped");
+            continue;
+          }
+
+          console.log("[IMPORT] Downloading missing page: " + page.filename);
+
+          const result = await downloadImage(page.url, savePath);
+
+          if (result.success) {
+            ok++;
+            page.status = "downloaded";
+            page.size = result.size;
+          } else {
+            page.status = "failed";
+            page.error = result.error;
+            failedPages.push(page.filename);
+            console.log("[IMPORT] Failed " + page.filename + ": " + result.error);
+          }
+        } catch (err) {
+          page.status = "failed";
+          page.error = err.message;
+          failedPages.push(page.filename);
+          console.log("[IMPORT] Failed " + page.filename + ": " + err.message);
+        }
       }
-
-      console.log("[IMPORT] Downloading missing page: " + p.filename);
-
-      const result = await downloadImage(p.url, savePath);
-
-      if (result.success) {
-        ok++;
-        p.status = "downloaded";
-        p.size = result.size;
-      } else {
-        p.status = "failed";
-        p.error = result.error;
-        failedPages.push(p.filename);
-        console.log("[IMPORT] Failed " + p.filename + ": " + result.error);
-      }
-
-      await new Promise(r => setTimeout(r, 300));
     }
+
+    const workerCount = Math.min(DOWNLOAD_CONCURRENCY, pages.length);
+    await Promise.all(
+      Array.from({ length: workerCount }, () => downloadWorker())
+    );
 
     const pdfName = previousManifest?.pdf
       ? path.basename(previousManifest.pdf)
