@@ -602,6 +602,57 @@
   
   <script>
     let importMode = "url";
+
+    window.librarySortOrder = (() => {
+      try {
+        return localStorage.getItem("mangaVaultChapterSort") || "desc";
+      } catch (e) {
+        return "desc";
+      }
+    })();
+
+    function getChapterNumber(label) {
+      const match = String(label || "").match(/\d+(?:\.\d+)?/);
+      return match ? Number(match[0]) : -1;
+    }
+
+    function getSortedChapters(chapters) {
+      return [...(chapters || [])].sort((a, b) => {
+        const difference = getChapterNumber(a.chapter) - getChapterNumber(b.chapter);
+        if (difference === 0) {
+          return String(a.chapter).localeCompare(String(b.chapter), undefined, { numeric: true });
+        }
+        return window.librarySortOrder === "asc" ? difference : -difference;
+      });
+    }
+
+    window.setChapterSort = function(order, index) {
+      if (!["asc", "desc"].includes(order)) return;
+
+      window.librarySortOrder = order;
+      try {
+        localStorage.setItem("mangaVaultChapterSort", order);
+      } catch (e) {}
+
+      const wrapper = document.querySelector('.series-wrapper[data-idx="' + index + '"]');
+      if (!wrapper) return;
+
+      const panel = wrapper.querySelector(".series-inline-panel");
+      if (!panel) return;
+
+      const rows = Array.from(panel.querySelectorAll(".library-chapter-row"));
+      rows.sort((a, b) => {
+        const difference = Number(a.dataset.chapterNumber) - Number(b.dataset.chapterNumber);
+        return order === "asc" ? difference : -difference;
+      });
+      rows.forEach(row => panel.appendChild(row));
+
+      const latest = wrapper.querySelector(".series-latest");
+      const series = window.librarySeries && window.librarySeries[index];
+      if (latest && series) {
+        latest.textContent = "Latest: " + (getSortedChapters(series.chapters)[0]?.chapter || "—");
+      }
+    };
     let isImporting = false;
 
 
@@ -644,7 +695,7 @@
                   <div class="series-info" style="flex:1; text-align:left;">
                     <strong style="display:block; font-size:18px; color:#fff; margin-bottom:4px;">${escapeHTML(series.title)}</strong>
                     <small style="display:block; font-size:13px; color:#b88aff;">${series.chapterCount} ${series.chapterCount === 1 ? "chapter" : "chapters"}</small>
-                    <small style="display:block; font-size:12px; color:#888;">Latest: ${escapeHTML(series.chapters[0]?.chapter || "—")}</small>
+                    <small class="series-latest" style="display:block; font-size:12px; color:#888;">Latest: ${escapeHTML(getSortedChapters(series.chapters)[0]?.chapter || "—")}</small>
                   </div>
                   <span class="series-arrow" style="font-size:20px; color:#b88aff; transition: transform 0.2s;">⌄</span>
                 </button>
@@ -729,6 +780,10 @@
         panel.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin:12px 0;">
             <h3 style="margin:0; font-size:16px;">Chapters</h3>
+            <select aria-label="Sort chapters" onchange="setChapterSort(this.value, ${index})" style="padding:7px 9px; border-radius:8px; background:#211532; color:#fff; border:1px solid #8a2be2;">
+              <option value="desc" ${window.librarySortOrder === "desc" ? "selected" : ""}>Descending ↓</option>
+              <option value="asc" ${window.librarySortOrder === "asc" ? "selected" : ""}>Ascending ↑</option>
+            </select>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
               <button onclick="toggleSelectAll(this)" style="padding:8px 12px; font-size:13px; border-radius:8px; background:transparent; border:1px solid #8a2be2; color:#b88aff; cursor:pointer; flex:1;">Select All</button>
               
@@ -743,8 +798,8 @@
               </button>
             </div>
           </div>
-          ${(series.chapters || []).map(item => `
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.05); flex-wrap:wrap;">
+          ${getSortedChapters(series.chapters).map(item => `
+            <div class="library-chapter-row" data-chapter-number="${getChapterNumber(item.chapter)}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.05); flex-wrap:wrap;">
               <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:150px;">
                 <input type="checkbox" class="dl-checkbox" value="${escapeHTML(item.pdf)}" onchange="toggleBulkActions(this)" style="width:20px; height:20px; accent-color:#8a2be2; flex-shrink:0;">
                 <strong style="font-size:14px; white-space:normal; line-height:1.2;">${escapeHTML(item.chapter)}</strong>
@@ -1003,13 +1058,24 @@
             `;
           }).join("");
 
-          // If any job just finished, refresh library
-          const hasSuccess = jobs.some(j => j.status === "success");
-          if (hasSuccess && !window._batchRefreshed) {
-             loadLibrary();
-             window._batchRefreshed = true;
+          // Refresh Library whenever a new queue job succeeds.
+          window._queueJobStatuses = window._queueJobStatuses || new Map();
+          let hasNewSuccess = false;
+
+          for (const job of jobs) {
+            const jobKey = String(job.id || job.url || "");
+            const previousStatus = window._queueJobStatuses.get(jobKey);
+
+            if (job.status === "success" && previousStatus !== "success") {
+              hasNewSuccess = true;
+            }
+
+            window._queueJobStatuses.set(jobKey, job.status);
           }
-          if (!hasSuccess) window._batchRefreshed = false;
+
+          if (hasNewSuccess) {
+            await loadLibrary();
+          }
 
         } catch (e) {
           console.error("Queue poll error:", e);
