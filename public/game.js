@@ -570,6 +570,15 @@ function handleArcadeNavigation() {
 window.startArcadeNinja = startArcadeNinja;
 window.stopArcadeNinja = stopArcadeNinja;
 
+// On a fresh page load, do not restore Arcade from an old URL hash.
+if (window.location.hash === "#arcade") {
+    history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search
+    );
+}
+
 window.addEventListener("hashchange", handleArcadeNavigation);
 
 document.addEventListener("DOMContentLoaded", handleArcadeNavigation);
@@ -1029,6 +1038,38 @@ function updateQueueRunnerScore() {
     if (score) score.textContent = "Score: " + queueRunnerState.score;
 }
 
+function updateQueueRunnerBackground() {
+    const arena = document.getElementById("queueRunnerArena");
+    if (!arena) return;
+
+    const score = queueRunnerState.score;
+    let bgNumber;
+
+    if (score < 100) {
+        bgNumber = 1;
+    } else if (score < 200) {
+        bgNumber = 2;
+    } else if (score < 300) {
+        bgNumber = 3;
+    } else {
+        const sequence = [2, 1, 3];
+        const step = Math.floor((score - 300) / 200);
+        bgNumber = sequence[step % sequence.length];
+    }
+
+    const current = arena.dataset.runnerBackground;
+    if (current === String(bgNumber)) return;
+
+    const file = bgNumber === 1
+        ? "runner-bg.png"
+        : `runner-bg-${bgNumber}.png`;
+
+    arena.style.background =
+        `url('/assets/${file}') center/cover no-repeat`;
+
+    arena.dataset.runnerBackground = String(bgNumber);
+}
+
 function createQueueRunnerPlayer(arena) {
     const arenaH = arena.clientHeight;
 
@@ -1279,6 +1320,7 @@ function runQueueRunnerFrame(now) {
         state.score++;
         state.lastScoreTime = now;
         updateQueueRunnerScore();
+        updateQueueRunnerBackground();
     }
 
     const speed = 3.5 + Math.min(state.score * 0.018, 2.5);

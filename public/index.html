@@ -934,6 +934,15 @@
           document.getElementById("batchUrls").value = "";
           document.getElementById("queueContainer").style.display = "block";
           pollQueue();
+
+          // Take the user to the Import section's Queue Arcade.
+          const queueArcade = document.getElementById("queueGameCard");
+          if (queueArcade) {
+            queueArcade.scrollIntoView({
+              behavior: "smooth",
+              block: "center"
+            });
+          }
         } else {
           alert("Error: " + data.error);
         }
