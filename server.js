@@ -364,7 +364,7 @@ if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
     const failedPages = [];
 
     // Four concurrent workers; PDF generation waits for all workers.
-    const DOWNLOAD_CONCURRENCY = 30;
+    const DOWNLOAD_CONCURRENCY = 40;
     let nextPageIndex = 0;
 
     async function downloadWorker() {
