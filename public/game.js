@@ -241,36 +241,33 @@ function launchArcadeShuriken(targetElement, wordIndex) {
     const arena = document.getElementById("arcadeNinjaArena");
 
     if (!state.active || !arena || !targetElement) return;
-
-    // Prevent typing the same bubble twice.
     if (targetElement.dataset.targeted === "true") return;
 
     targetElement.dataset.targeted = "true";
 
+    const SIZE = 42;
+    const OFFSET = SIZE / 2;
+
     const startX = arena.clientWidth / 2;
     const startY = arena.clientHeight - 32;
 
-    const endX =
-        targetElement.offsetLeft + targetElement.offsetWidth / 2;
-
-    const endY =
-        targetElement.offsetTop + targetElement.offsetHeight / 2;
+    const endX = targetElement.offsetLeft + targetElement.offsetWidth / 2;
+    const endY = targetElement.offsetTop + targetElement.offsetHeight / 2;
 
     const shuriken = document.createElement("img");
-
     shuriken.src = "/assets/shuriken.png";
     shuriken.alt = "";
 
     shuriken.style.cssText = `
         position:absolute;
-        width:60px;
-        height:60px;
-        left:${startX - 30}px;
-        top:${startY - 30}px;
+        width:${SIZE}px;
+        height:${SIZE}px;
+        left:${startX - OFFSET}px;
+        top:${startY - OFFSET}px;
         z-index:99999;
         pointer-events:none;
         object-fit:contain;
-        filter:drop-shadow(0 0 8px #b44cff);
+        filter:drop-shadow(0 0 6px #b44cff);
         will-change:left,top,transform;
     `;
 
@@ -286,7 +283,7 @@ function launchArcadeShuriken(targetElement, wordIndex) {
 
     const duration = 280;
     const startTime = performance.now();
-    const totalRotation = 1080; // Three complete rotations.
+    const totalRotation = 1080;
 
     function animateProjectile(now) {
         if (!state.active) {
@@ -295,35 +292,21 @@ function launchArcadeShuriken(targetElement, wordIndex) {
             return;
         }
 
-        const progress = Math.min(
-            (now - startTime) / duration,
-            1
-        );
-
-        // Smooth acceleration towards the target.
+        const progress = Math.min((now - startTime) / duration, 1);
         const eased = 1 - Math.pow(1 - progress, 2);
 
-        const currentX =
-            startX + (endX - startX) * eased;
+        const currentX = startX + (endX - startX) * eased;
+        const currentY = startY + (endY - startY) * eased;
 
-        const currentY =
-            startY + (endY - startY) * eased;
-
-        const rotation = totalRotation * progress;
-
-        // Instant position update. No CSS position transition.
-        shuriken.style.left = (currentX - 30) + "px";
-        shuriken.style.top = (currentY - 30) + "px";
-        shuriken.style.transform = `rotate(${rotation}deg)`;
+        shuriken.style.left = (currentX - OFFSET) + "px";
+        shuriken.style.top = (currentY - OFFSET) + "px";
+        shuriken.style.transform = `rotate(${totalRotation * progress}deg)`;
 
         if (progress < 1) {
-            projectile.raf = requestAnimationFrame(
-                animateProjectile
-            );
+            projectile.raf = requestAnimationFrame(animateProjectile);
             return;
         }
 
-        // IMPACT!
         shuriken.remove();
         state.projectiles.delete(projectile);
 
@@ -332,10 +315,7 @@ function launchArcadeShuriken(targetElement, wordIndex) {
         createNinjaImpact(endX, endY);
 
         const index = state.words.indexOf(targetElement);
-
-        if (index !== -1) {
-            state.words.splice(index, 1);
-        }
+        if (index !== -1) state.words.splice(index, 1);
 
         targetElement.classList.add("ninja-word-pop");
 
