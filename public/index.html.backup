@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#09080f" />
+  <title>MangaVault — Story Research Studio</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+    :root {
+      --bg: #09080f;
+      --panel: #17151f;
+      --panel-2: #1d1a27;
+      --line: rgba(205, 180, 255, .19);
+      --text: #f7f3ff;
+      --muted: #aaa3b7;
+      --purple: #b58aff;
+      --purple-2: #8d50ef;
+      --green: #8be0b5;
+      --shadow: 0 22px 70px rgba(0,0,0,.42);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text);
+      background:
+        radial-gradient(ellipse at 82% 5%, rgba(117,55,183,.20), transparent 32%),
+        radial-gradient(ellipse at 5% 55%, rgba(75,42,116,.13), transparent 30%), var(--bg);
+      font-family: "DM Sans", system-ui, sans-serif;
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .topbar {
+      height: 76px; position: sticky; top: 0; z-index: 20;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 4.5%; border-bottom: 1px solid var(--line);
+      background: rgba(10,8,16,.88); backdrop-filter: blur(18px);
+    }
+    .brand { display:flex; align-items:center; gap:12px; text-decoration:none; color:var(--text); }
+    .brand-mark { color:var(--purple); font-size:31px; filter:drop-shadow(0 0 12px #a36bff); }
+    .brand-name { font:700 21px "Space Grotesk",sans-serif; letter-spacing:-1px; }
+    .brand-name span { color:var(--purple); }
+    .brand small { display:block; color:#bcb2ca; font-size:9px; letter-spacing:2px; margin-top:1px; }
+    .nav { display:flex; align-items:center; gap:9px; }
+    .nav a { color:#c9c2d3; text-decoration:none; padding:10px 15px; border-radius:30px; font-size:13px; }
+    .nav a.active, .nav a:hover { color:#fff; border:1px solid #a979f2; background:rgba(160,112,240,.13); }
+    .nav-tools { display:flex; gap:12px; align-items:center; }
+    .icon-btn { width:39px;height:39px;border-radius:50%;border:1px solid var(--line);background:#171421;color:#eee;font-size:17px; }
+    .avatar { width:39px;height:39px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#d5b7ff,#58318c);color:#1a1028;font-weight:800; }
+    .layout { display:grid; grid-template-columns:190px minmax(0,1fr); gap:25px; max-width:1500px; margin:auto; padding:25px 4.5% 55px; }
+    aside { padding-top:115px; }
+    .side-label { color:#8f879c;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:0 13px;margin:26px 0 10px; }
+    .side-link { display:flex;align-items:center;gap:12px;color:#c9c2d3;text-decoration:none;padding:12px 13px;border-radius:12px;font-size:13px;margin:3px 0; }
+    .side-link span { width:20px;text-align:center;color:#c6a1ff;font-size:17px; }
+    .side-link.active,.side-link:hover { background:linear-gradient(90deg,rgba(157,100,239,.23),rgba(157,100,239,.04));color:white; }
+    .side-divider { height:1px;background:var(--line);margin:20px 10px; }
+    main { min-width:0; }
+    .hero {
+      position:relative; min-height:315px; overflow:hidden; border-radius:22px;
+      border:1px solid rgba(202,173,255,.16); box-shadow:var(--shadow);
+      background:
+        linear-gradient(90deg,rgba(9,8,15,.96) 0%,rgba(9,8,15,.83) 39%,rgba(9,8,15,.08) 100%),
+        url("/assets/mangavault-hero.png") center right / cover no-repeat,
+        linear-gradient(125deg,#1b1329,#08070d 65%);
+    }
+    .hero:before {
+      content:""; position:absolute; inset:0; opacity:.32;
+      background-image:repeating-linear-gradient(135deg,transparent 0 17px,rgba(255,255,255,.035) 18px 19px);
+      mask-image:linear-gradient(90deg,black,transparent);
+    }
+    .hero-art { display:none; }
+    .hero-content { position:relative;z-index:2;padding:38px 34px;max-width:570px; }
+    .eyebrow { display:inline-block;color:#d0b3ff;border:1px solid rgba(187,142,255,.65);border-radius:30px;padding:7px 13px;font-size:10px;font-weight:700;letter-spacing:2px; }
+    h1 { font:700 clamp(40px,5vw,67px)/.98 "Space Grotesk",sans-serif;letter-spacing:-3px;margin:22px 0 14px; }
+    h1 em { color:var(--purple);font-style:italic;display:block; }
+    .hero p { color:#c2bacd;line-height:1.7;font-size:14px;max-width:390px; }
+    .import-card { position:relative;z-index:3;margin:-2px 0 20px;padding:23px 27px;border:1px solid rgba(199,169,255,.48);border-radius:19px;background:linear-gradient(110deg,rgba(29,24,39,.98),rgba(16,14,23,.98));box-shadow:0 15px 45px rgba(0,0,0,.35); }
+    .import-head { display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:17px; }
+    .import-title { font:700 23px "Space Grotesk"; }
+    .import-title b { color:var(--purple);margin-right:8px; }
+    .tabs { display:flex;gap:8px; }
+    .tab { border:1px solid var(--line);border-radius:25px;padding:9px 14px;background:#211b2b;color:#d6cce4;font-size:12px; }
+    .tab.active { border-color:var(--purple);background:rgba(173,130,255,.18);color:white; }
+    .import-row { display:flex;gap:12px; }
+    .url-input { flex:1;min-width:0;background:#0d0b13;border:1px solid #51465e;border-radius:11px;padding:15px 16px;color:white;outline:none; }
+    .url-input:focus { border-color:var(--purple);box-shadow:0 0 0 3px rgba(181,138,255,.12); }
+    .primary { border:0;border-radius:11px;padding:0 22px;background:linear-gradient(110deg,#c5a2ff,#9e70f3);color:#170e25;font-weight:800;box-shadow:0 7px 22px rgba(155,100,240,.25); }
+    .hint { color:#a59caf;font-size:12px;margin:12px 0 0; }
+    .stats { display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:20px 0 26px; }
+    .stat { position:relative;overflow:hidden;border:1px solid var(--line);border-radius:15px;padding:17px;background:linear-gradient(130deg,#1b1724,#111018); }
+    .stat:after { content:"";position:absolute;width:90px;height:90px;right:-28px;top:-28px;border-radius:50%;background:rgba(168,112,255,.12); }
+    .stat-row { display:flex;align-items:center;gap:13px; }
+    .stat-icon { color:#b47aff;font-size:25px; }
+    .stat strong { display:block;font:700 27px "Space Grotesk"; }
+    .stat small { color:#c0b8ca;font-size:11px; }
+    .section-head { display:flex;align-items:center;justify-content:space-between;margin:25px 0 14px; }
+    .section-head h2 { margin:0;font:700 22px "Space Grotesk"; }
+    .section-head a { color:var(--purple);font-size:12px;text-decoration:none; }
+    .empty-library { min-height:245px;position:relative;overflow:hidden;display:flex;align-items:center;border:1px solid var(--line);border-radius:17px;background:linear-gradient(90deg,#171321 0%,rgba(20,15,29,.96) 43%,rgba(16,12,23,.2) 100%),url("/assets/mangavault-hero.png") center 42% / cover no-repeat; }
+    .empty-copy { position:relative;z-index:2;width:55%;padding:28px 32px;text-align:center; }
+    .empty-icon { display:block;color:var(--purple);font-size:34px;margin-bottom:8px; }
+    .empty-copy h3 { margin:0 0 8px;font:700 21px "Space Grotesk"; }
+    .empty-copy p { margin:0 auto 18px;color:#bcb2ca;font-size:13px;line-height:1.6;max-width:290px; }
+    .empty-cta { display:inline-block;text-decoration:none;background:linear-gradient(110deg,#c5a2ff,#9e70f3);color:#170e25;padding:12px 20px;border-radius:25px;font-size:12px;font-weight:800; }
+    .empty-art { position:absolute;inset:0 0 0 48%;background:url("/assets/library-empty.png") 78% 35% / cover no-repeat;mask-image:linear-gradient(90deg,transparent,black 24%);opacity:.78; }
+    .bottom-grid { display:grid;grid-template-columns:1.25fr 1fr;gap:24px;margin-top:28px; }
+    .creative { position:relative;min-height:220px;overflow:hidden;padding:25px;border:1px solid #78529c;border-radius:17px;background:linear-gradient(90deg,rgba(20,12,28,.96),rgba(20,12,28,.72) 55%,rgba(20,12,28,.2)),url("/assets/creative-lab.png") center 35% / cover no-repeat; }
+    .creative:after { content:none;position:absolute;right:10%;top:-27px;font-size:150px;color:rgba(237,174,255,.22); }
+    .creative h2 { position:relative;z-index:1;margin:0 0 12px;font:700 25px "Space Grotesk"; }
+    .creative p { position:relative;z-index:1;color:#c8b9d2;max-width:290px;font-size:13px;line-height:1.6; }
+    .chips { display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;position:relative;z-index:1; }
+    .chips span { border:1px solid #76548d;border-radius:25px;padding:7px 11px;font-size:10px;color:#e2d3f0;background:rgba(12,8,18,.35); }
+    .recent h2 { font:700 20px "Space Grotesk";margin:0 0 12px; }
+    .recent-list { border:1px solid var(--line);border-radius:15px;background:#17141e;padding:5px 14px; }
+    .recent-empty { min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center;color:#cfc4dc; }
+    .recent-empty span { color:var(--purple);font-size:25px; }
+    .recent-empty strong { font-size:13px; }
+    .recent-empty small { color:var(--muted);font-size:11px; }
+    .recent-item { display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.07); }
+    .recent-item:last-child { border:0; }
+    .thumb { width:43px;height:43px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(140deg,#777,#17141e);font-weight:800; }
+    .recent-item strong { display:block;font-size:12px; }
+    .recent-item small { color:#aaa1b5;font-size:10px; }
+    .status { color:var(--green); }
+    .mobile-nav { display:none; }
+    .toast { position:fixed;left:50%;bottom:25px;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#2b2338;border:1px solid #8d65c0;color:white;padding:12px 18px;border-radius:12px;transition:.25s;z-index:99;font-size:13px; }
+    .toast.show { opacity:1;transform:translate(-50%,0); }
+    @media(max-width:900px) {
+      .layout { grid-template-columns:1fr;padding:18px 4%; }
+      aside { display:none; }
+      .nav { display:none; }
+      .hero { min-height:285px; }
+      .hero-art { right:-5%;width:48%;opacity:.8; }
+      
+      .stats { grid-template-columns:repeat(2,1fr); }
+      .mobile-nav { position:fixed;bottom:0;left:0;right:0;z-index:30;display:flex;justify-content:space-around;padding:10px 5px calc(10px + env(safe-area-inset-bottom));background:rgba(15,12,21,.95);border-top:1px solid var(--line);backdrop-filter:blur(15px); }
+      .mobile-nav a { color:#c9c0d5;text-decoration:none;text-align:center;font-size:10px; }
+      .mobile-nav span { display:block;color:#c19bff;font-size:19px;margin-bottom:2px; }
+      body { padding-bottom:70px; }
+    }
+    @media(max-width:560px) {
+      .topbar { height:65px;padding:0 4%; }
+      .brand-name { font-size:19px; }
+      .layout { padding:14px 4% 35px; }
+      .hero { min-height:310px;border-radius:17px; }
+      .hero-content { padding:27px 21px; }
+      h1 { font-size:48px;letter-spacing:-2px;max-width:300px; }
+      .hero p { max-width:260px;font-size:12px; }
+      .hero-art { width:57%;right:-16%;opacity:.62; }
+      .import-card { padding:18px 15px;border-radius:16px; }
+      .import-head { display:block; }
+      .import-title { font-size:20px;margin-bottom:14px; }
+      .tabs { margin-bottom:14px; }
+      .tab { flex:1;padding:9px 7px; }
+      .import-row { flex-direction:column; }
+      .url-input { padding:14px; }
+      .primary { min-height:48px; }
+      .stats { gap:9px;margin:14px 0 22px; }
+      .stat { padding:12px 10px; }
+      .stat-icon { font-size:21px; }
+      .stat strong { font-size:23px; }
+      .stat small { font-size:9px; }
+      .section-head h2 { font-size:19px; }
+            .empty-library { min-height:235px; }
+      .empty-copy { width:65%;padding:20px 12px; }
+      .empty-copy h3 { font-size:18px; }
+      .empty-copy p { font-size:11px; }
+      .empty-art { left:45%; }
+      .bottom-grid { grid-template-columns:1fr;gap:20px;margin-top:22px; }
+      .creative { min-height:205px;padding:21px; }
+      .recent h2 { font-size:18px; }
+    }
+  
+    /* MangaVault Series Library */
+    .series-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
+      gap:14px;
+    }
+
+    .series-card {
+      width:100%;
+      display:flex;
+      align-items:center;
+      gap:14px;
+      padding:15px;
+      text-align:left;
+      color:#f5efff;
+      background:linear-gradient(135deg,#21172f,#17141e);
+      border:1px solid rgba(193,155,255,.28);
+      border-radius:16px;
+      cursor:pointer;
+      font:inherit;
+      transition:border-color .2s, transform .2s;
+    }
+
+    .series-card:active {
+      transform:scale(.98);
+    }
+
+    .series-card:hover {
+      border-color:#b98cff;
+    }
+
+    .series-cover img {
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+      border-radius:9px;
+    }
+
+    .series-cover span {
+      font-size:28px;
+    }
+
+    .series-cover {
+      width:65px;
+      height:85px;
+      flex-shrink:0;
+      display:grid;
+      place-items:center;
+      border-radius:10px;
+      color:#e5caff;
+      font-size:28px;
+      background:linear-gradient(145deg,#51316e,#21152e);
+      border:1px solid rgba(255,255,255,.12);
+    }
+
+    .series-info {
+      flex:1;
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    .series-info strong {
+      font-size:15px;
+      overflow-wrap:anywhere;
+    }
+
+    .series-info small {
+      color:#b9adc8;
+      font-size:11px;
+    }
+
+    .series-arrow {
+      color:#c19bff;
+      font-size:23px;
+      padding:5px;
+    }
+
+    #seriesCount {
+      color:#b9adc8;
+      font-size:12px;
+    }
+
+    #seriesChapters {
+      margin-top:14px;
+      padding:15px;
+      background:#17141e;
+      border:1px solid var(--line);
+      border-radius:15px;
+    }
+
+    .series-chapter-heading {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom:12px;
+    }
+
+    .series-chapter-heading h3 {
+      margin:0;
+      font-size:16px;
+    }
+
+    .series-chapter-heading span {
+      color:#aaa1b5;
+      font-size:11px;
+    }
+
+    .series-chapter-item {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      padding:13px 0;
+      border-top:1px solid rgba(255,255,255,.08);
+    }
+
+    .series-chapter-item strong {
+      font-size:12px;
+    }
+
+    .chapter-actions {
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+
+    .chapter-actions a {
+      color:#c19bff;
+      font-size:11px;
+      text-decoration:none;
+      white-space:nowrap;
+    }
+
+    @media(max-width:480px) {
+      .series-grid {
+        grid-template-columns:1fr;
+      }
+    }
+
+  
+    /* Queue Styling */
+    .queue-item {
+      display: flex; align-items: center; gap: 12px; padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .queue-item:last-child { border-bottom: none; }
+    .queue-icon {
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: bold; font-size: 14px; flex-shrink: 0;
+    }
+    .icon-wait { background: rgba(255,255,255,0.1); color: #aaa; }
+    .icon-wait::after { content: '…'; }
+    
+    .icon-load { background: rgba(255, 204, 0, 0.15); color: #ffcc00; border: 2px solid #ffcc00; border-top-color: transparent; animation: spin 1s linear infinite; box-sizing: border-box; }
+    
+    .icon-done { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
+    .icon-done::after { content: '✓'; }
+    
+    .icon-fail { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+    .icon-fail::after { content: '✕'; }
+    
+    .queue-content { flex: 1; overflow: hidden; }
+    .queue-url { font-size: 12px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+    .queue-status { font-size: 11px; font-weight: 500; }
+    
+    .text-muted { color: #888; }
+    .text-warning { color: #ffcc00; }
+    .text-success { color: #4ade80; }
+    .text-danger { color: #f87171; }
+
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+
+  
+    /* Fix cover overflow */
+    .series-card {
+      overflow: hidden;
+    }
+    .series-cover, .series-card img, .cover-img {
+      width: 70px !important;
+      height: 100px !important;
+      object-fit: cover !important;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    .series-header {
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+    }
+
+  
+    .btn-zip {
+      background: rgba(138, 43, 226, 0.15);
+      border: 1px solid rgba(138, 43, 226, 0.5);
+      color: #c19bff;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(4px);
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-zip:hover {
+      background: rgba(138, 43, 226, 0.3);
+      border-color: #b88aff;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(138, 43, 226, 0.4);
+    }
+    .btn-clear {
+      background: transparent;
+      border: none;
+      color: rgba(255, 107, 107, 0.7);
+      font-size: 11px;
+      cursor: pointer;
+      padding: 6px;
+      transition: color 0.2s;
+    }
+    .btn-clear:hover {
+      color: #ff6b6b;
+    }
+
+  
+    .hero-banner, .hero-bg, .hero-image, .hero-section {
+      background-image: url('/assets/bg.png') !important;
+      background-size: cover !important;
+      background-position: center top !important;
+    }
+    
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#">
+      <span class="brand-mark">◈</span>
+      <span><span class="brand-name">Manga<span>Vault.</span></span><small>STORY RESEARCH STUDIO</small></span>
+    </a>
+    <nav class="nav">
+      <a class="active" href="#">⌂ &nbsp;Home</a>
+      <a href="#library">▣ &nbsp;Library</a>
+      <a href="#analysis">♧ &nbsp;Analysis</a>
+      <a href="#tools">⚒ &nbsp;Tools</a>
+    </nav>
+    <div class="nav-tools">
+      <button class="icon-btn" aria-label="Search" onclick="showToast('Search is coming soon')">⌕</button>
+      <button class="icon-btn" aria-label="Notifications" onclick="showToast('You are all caught up')">♧</button>
+      <div class="avatar">M</div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <a class="side-link active" href="#"> <span>⌂</span> Home</a>
+      <a class="side-link" href="#library"><span>▣</span> Library</a>
+      <a class="side-link" href="#import"><span>↓</span> Import</a>
+      <a class="side-link" href="#analysis"><span>▥</span> Analysis</a>
+      <a class="side-link" href="#library"><span>▤</span> Collections</a>
+      <div class="side-divider"></div>
+      <div class="side-label">Workspaces</div>
+      <a class="side-link" href="#tools"><span>▱</span> Game Research</a>
+      <a class="side-link" href="#tools"><span>▱</span> World Building</a>
+    </aside>
+
+    <main>
+      <section class="hero">
+        
+        <div class="hero-content">
+          <span class="eyebrow">STORY RESEARCH STUDIO · 001</span>
+          <h1>Stories worth <em>Exploring.</em></h1>
+          <p>Collect manga. Study characters. Analyse storytelling. Build your own universe.</p>
+        </div>
+      </section>
+
+      <section class="import-card" id="import">
+        <div class="import-head">
+          <div class="import-title"><b>↓</b> Import a Chapter</div>
+          <div class="tabs">
+            <button class="tab active" id="urlTab" onclick="setMode('url')">↗ From URL</button>
+            <button class="tab" id="imageTab" onclick="setMode('images')">▧ From Images</button>
+          </div>
+        </div>
+        <form id="importForm">
+          <div class="import-row">
+            <input class="url-input" id="chapterUrl" type="url" placeholder="Paste a chapter URL here..." required />
+            <button class="primary" type="submit">↓ &nbsp;Import Chapter</button>
+          </div>
+        </form>
+
+      <div class="batch-section" style="margin-top: 24px; padding-top: 24px; border-top: 1px dashed rgba(255,255,255,0.1);">
+        <h3 style="margin-bottom: 12px; font-size: 16px;">Batch Import</h3>
+        <div style="display:flex; gap:10px; margin-bottom:12px; align-items:center; flex-wrap:wrap;">
+          <label style="font-size:12px; color:#b88aff; display:flex; align-items:center; gap:5px; cursor:pointer;">
+            <input type="checkbox" id="autoRange" onchange="toggleRangeUI()"> Auto-Fetch Range
+          </label>
+          <div id="rangeSettings" style="display:none; gap:8px; align-items:center;">
+            <span style="font-size:11px; color:#aaa;">From</span>
+            <input type="number" id="rangeStart" value="1" min="1" style="width:60px; padding:4px 8px; border-radius:6px; border:1px solid rgba(138,43,226,0.4); background:rgba(0,0,0,0.5); color:white; font-size:12px;">
+            <span style="font-size:11px; color:#aaa;">To</span>
+            <input type="number" id="rangeEnd" value="10" min="1" style="width:60px; padding:4px 8px; border-radius:6px; border:1px solid rgba(138,43,226,0.4); background:rgba(0,0,0,0.5); color:white; font-size:12px;">
+          </div>
+        </div>
+        <textarea id="batchUrls" placeholder="Paste one URL per line..." style="width: 100%; height: 100px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; font-family: monospace; margin-bottom: 12px; box-sizing: border-box;"></textarea>
+        <button class="btn-solid" onclick="startBatchImport()" style="width: 100%;">Start Batch Download</button>
+      </div>
+
+      <!-- Live Queue UI -->
+      <div id="queueContainer" style="display: none; margin-top: 24px; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 16px; border: 1px solid rgba(138,43,226,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="margin: 0; font-size: 16px; color: #b88aff;">Download Queue</h3>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button id="zipBtn" class="btn-zip" onclick="downloadBatchZip()" style="display:none;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Download ZIP
+            </button>
+            <button id="downloadAllBtn" class="btn-zip" onclick="window._completedPdfs.length && window._completedPdfs.forEach(p=>{const a=document.createElement('a');a.href=p;a.download='';document.body.appendChild(a);a.click();a.remove();})" style="display:none;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Save All PDFs
+            </button>
+            <button class="btn-clear" onclick="clearQueue()">Clear Finished</button>
+          </div>
+        </div>
+        <div id="queueList"></div>
+      </div>
+        <p class="hint" id="importHint">Only sources and content that permit downloading will be supported.</p>
+      </section>
+
+      <section class="stats" id="analysis">
+        <div class="stat"><div class="stat-row"><span class="stat-icon">▣</span><div><strong id="chapterCount">00</strong><small>Chapters Collected</small></div></div></div>
+        <div class="stat"><div class="stat-row"><span class="stat-icon">▱</span><div><strong>00</strong><small>Series Tracked</small></div></div></div>
+        <div class="stat"><div class="stat-row"><span class="stat-icon">▥</span><div><strong>00</strong><small>Stories Analysed</small></div></div></div>
+        <div class="stat"><div class="stat-row"><span class="stat-icon">♧</span><div><strong>00</strong><small>Game References</small></div></div></div>
+      </section>
+
+      <section id="library">
+        <div class="section-head">
+          <h2>▥ &nbsp;Your Library</h2>
+          <span id="seriesCount">0 series</span>
+        </div>
+        <div id="seriesGrid" class="series-grid">
+          <div class="empty-library">
+            <div class="empty-copy">
+              <span class="empty-icon">▣</span>
+              <h3>Your library is empty.</h3>
+              <p>Import your first chapter to start building your collection.</p>
+              <a class="empty-cta" href="#import">↓ &nbsp;Import a Chapter</a>
+            </div>
+            <div class="empty-art" role="img" aria-label="Original anime adventurer looking toward a moonlit sky"></div>
+          </div>
+        </div>
+        <div id="seriesChapters" hidden></div>
+      </section>
+
+      <section class="bottom-grid" id="tools">
+        <div class="creative">
+          <h2>✧ &nbsp;Creative Lab</h2>
+          <p>Turn what you read into original worlds. Explore character arcs, story structures and game concepts.</p>
+          <div class="chips"><span>Character Study</span><span>World Building</span><span>Game Ideas</span></div>
+        </div>
+        <div class="recent">
+          <h2>◷ &nbsp;Recent Imports</h2>
+          <div class="recent-list recent-empty" id="recentImports">
+            <span>◷</span>
+            <strong>Loading library...</strong>
+            <small>Your imported chapters will appear here.</small>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="mobile-nav">
+    <a href="#"><span>⌂</span>Home</a><a href="#library"><span>▣</span>Library</a><a href="#import"><span>↓</span>Import</a><a href="#analysis"><span>▥</span>Analysis</a><a href="#tools"><span>⚒</span>Tools</a>
+  </nav>
+  <div class="toast" id="toast"></div>
+
+  
+  <script>
+    let importMode = "url";
+    let isImporting = false;
+
+
+    async function loadLibrary() {
+      const container = document.getElementById("recentImports");
+      const grid = document.getElementById("seriesGrid");
+      const count = document.getElementById("seriesCount");
+      const chapterPanel = document.getElementById("seriesChapters");
+
+      try {
+        const response = await fetch("/api/library");
+        if (!response.ok) throw new Error("Library could not load");
+
+        const data = await response.json();
+        const seriesList = data.series || [];
+
+        count.textContent = `${seriesList.length} ${seriesList.length === 1 ? "series" : "series"}`;
+
+        if (seriesList.length === 0) {
+          grid.innerHTML = `
+            <div class="empty-library">
+              <div class="empty-copy">
+                <span class="empty-icon">▣</span>
+                <h3>Your library is empty.</h3>
+                <p>Import your first chapter to start building your collection.</p>
+                <a class="empty-cta" href="#import">↓ &nbsp;Import a Chapter</a>
+              </div>
+              <div class="empty-art" role="img" aria-label="Original anime adventurer looking toward a moonlit sky"></div>
+            </div>
+          `;
+        } else {
+          grid.innerHTML = seriesList.map((series, index) => `
+              <div class="series-wrapper" data-idx="${index}" style="margin-bottom:16px; border-radius:16px; background:rgba(20,10,40,0.5); border:1px solid rgba(138,43,226,0.2); overflow:hidden;">
+                <button type="button" class="series-card" onclick="toggleSeries(${index})" style="width:100%; border:none; background:transparent; display:flex; gap:16px; padding:16px; align-items:center; cursor:pointer;">
+                  <div class="series-cover" style="width:70px; height:100px; flex-shrink:0;">
+                    ${series.cover
+                      ? `<img src="${escapeHTML(series.cover)}" alt="cover" loading="lazy" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`
+                      : `<span style="display:flex; align-items:center; justify-content:center; height:100%; background:rgba(138,43,226,0.2); border-radius:8px;">▤</span>`}
+                  </div>
+                  <div class="series-info" style="flex:1; text-align:left;">
+                    <strong style="display:block; font-size:18px; color:#fff; margin-bottom:4px;">${escapeHTML(series.title)}</strong>
+                    <small style="display:block; font-size:13px; color:#b88aff;">${series.chapterCount} ${series.chapterCount === 1 ? "chapter" : "chapters"}</small>
+                    <small style="display:block; font-size:12px; color:#888;">Latest: ${escapeHTML(series.chapters[0]?.chapter || "—")}</small>
+                  </div>
+                  <span class="series-arrow" style="font-size:20px; color:#b88aff; transition: transform 0.2s;">⌄</span>
+                </button>
+                <div class="series-inline-panel" style="display:none; padding:0 16px 16px 16px; border-top:1px solid rgba(255,255,255,0.05);"></div>
+              </div>
+            `).join("");
+        }
+
+        window.librarySeries = seriesList;
+        chapterPanel.hidden = true;
+        chapterPanel.innerHTML = "";
+
+        if (!data.chapters || data.chapters.length === 0) {
+          container.className = "recent-list recent-empty";
+          container.innerHTML = `
+            <span>◷</span>
+            <strong>No imports yet</strong>
+            <small>Your imported chapters will appear here.</small>
+          `;
+          return;
+        }
+
+        container.className = "recent-list";
+
+        const recentItems = seriesList
+          .flatMap(series => (series.chapters || []).map(item => ({ ...item, title: series.title })))
+          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+        // Limit Recent Imports to the 10 newest
+        const limitedItems = recentItems.slice(0, 10);
+        
+        container.innerHTML = limitedItems.map(item => {
+          const title = escapeHTML(item.title);
+          const chapter = escapeHTML(item.chapter);
+          const date = item.createdAt
+            ? new Date(item.createdAt).toLocaleDateString()
+            : "Recently imported";
+          const pages = item.pages ? `${item.pages} pages` : "PDF document";
+
+          return `
+            <div class="recent-item">
+              <div class="thumb">▤</div>
+              <div style="flex:1;min-width:0">
+                <strong>${title}</strong>
+                <small>${chapter} · ${pages}</small><br>
+                <small>${date} · <span class="status">PDF Ready</span></small>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+                <a href="${escapeHTML(item.pdf)}" target="_blank"
+                   rel="noopener" style="color:#c19bff;font-size:11px;text-decoration:none">
+                  Read ↗
+                </a>
+                <a href="${escapeHTML(item.pdf)}"
+                   download="${escapeHTML((item.title + ' ' + item.chapter).replace(/[^a-zA-Z0-9 _-]/g, '').trim())}.pdf"
+                   style="color:#ffffff;background:#7545a5;padding:7px 10px;border-radius:8px;font-size:10px;text-decoration:none">
+                  ↓ Download
+                </a>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+      } catch (error) {
+        container.className = "recent-list recent-empty";
+        container.textContent = "Unable to load library. Refresh the page.";
+        console.error(error);
+      }
+    }
+
+    function toggleSeries(index) {
+      const wrapper = document.querySelector('.series-wrapper[data-idx="' + index + '"]');
+      if (!wrapper) { console.error("Wrapper missing for", index); return; }
+      
+      const panel = wrapper.querySelector('.series-inline-panel');
+      const arrow = wrapper.querySelector('.series-arrow');
+      if (!panel) { console.error("Panel missing"); return; }
+      
+      const series = window.librarySeries && window.librarySeries[index];
+      if (!series) { console.error("Series data missing"); return; }
+
+      if (panel.style.display === 'none' || panel.innerHTML.trim() === '') {
+        panel.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin:12px 0;">
+            <h3 style="margin:0; font-size:16px;">Chapters</h3>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+              <button onclick="toggleSelectAll(this)" style="padding:8px 12px; font-size:13px; border-radius:8px; background:transparent; border:1px solid #8a2be2; color:#b88aff; cursor:pointer; flex:1;">Select All</button>
+              
+              <button onclick="downloadSelected(this)" style="padding:8px 12px; font-size:13px; border-radius:8px; background:#8a2be2; color:white; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; flex:1;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Save PDFs
+              </button>
+              
+              <button onclick="downloadSelectedZip(this)" style="padding:8px 12px; font-size:13px; border-radius:8px; background:rgba(138,43,226,0.15); border:1px solid #8a2be2; color:#b88aff; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; flex:1;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Download ZIP
+              </button>
+            </div>
+          </div>
+          ${(series.chapters || []).map(item => `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.05); flex-wrap:wrap;">
+              <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:150px;">
+                <input type="checkbox" class="dl-checkbox" value="${escapeHTML(item.pdf)}" onchange="toggleBulkActions(this)" style="width:20px; height:20px; accent-color:#8a2be2; flex-shrink:0;">
+                <strong style="font-size:14px; white-space:normal; line-height:1.2;">${escapeHTML(item.chapter)}</strong>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+                <a href="${escapeHTML(item.pdf)}" target="_blank" style="color:#c19bff; font-size:13px; text-decoration:none;">Read ↗</a>
+                <a href="${escapeHTML(item.pdf)}" download style="color:#fff; font-size:13px; text-decoration:none;">Download ↓</a>
+                <button onclick="deleteChapter('${item.id}', '${escapeHTML(item.pdf)}', this)" style="background:none;border:none;color:#f87171;font-size:13px;cursor:pointer;">Delete</button>
+              </div>
+            </div>
+          `).join("")}
+        `;
+        panel.style.display = 'block';
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+      } else {
+        panel.style.display = 'none';
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    function escapeHTML(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      })[char]);
+    }
+
+    function setMode(mode) {
+      if (isImporting) return;
+      importMode = mode;
+      document.getElementById("urlTab").classList.toggle("active", mode === "url");
+      document.getElementById("imageTab").classList.toggle("active", mode === "images");
+      const input = document.getElementById("chapterUrl");
+      const hint = document.getElementById("importHint");
+      if (mode === "images") {
+        input.placeholder = "Image upload will be added to this importer...";
+        input.disabled = true;
+        hint.textContent = "Image importing needs the upload endpoint to be connected.";
+        showToast("Image import UI selected");
+      } else {
+        input.placeholder = "Paste a chapter URL here...";
+        input.disabled = false;
+        hint.textContent = "Only sources and content that permit downloading will be supported.";
+      }
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => toast.classList.remove("show"), 3200);
+    }
+
+    function setImporting(state) {
+      isImporting = state;
+      const btn = document.querySelector("#importForm .primary");
+      const input = document.getElementById("chapterUrl");
+      if (state) {
+        btn.disabled = true;
+        btn.textContent = "Importing...";
+        input.disabled = true;
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = "↓ &nbsp;Import Chapter";
+        input.disabled = importMode === "images";
+      }
+    }
+
+    loadLibrary();
+
+    document.getElementById("importForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (isImporting) return;
+
+      const url = document.getElementById("chapterUrl").value.trim();
+      if (!url) return showToast("Paste a chapter URL first");
+
+      setImporting(true);
+      showToast("Starting import... this may take 30-60 seconds");
+
+      try {
+        const response = await fetch("/api/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Import failed");
+
+        showToast(data.message || "Import successful!");
+        await loadLibrary();
+      } catch (error) {
+        showToast(error.message || "Could not connect to the import API");
+      } finally {
+        setImporting(false);
+      }
+    });
+  
+    window.toggleBulkActions = function(checkbox) {
+      const seriesCard = checkbox.closest('.series-chapter-item').parentElement.parentElement;
+      const actionRow = seriesCard.querySelector('.bulk-actions');
+      const anyChecked = seriesCard.querySelectorAll('.dl-checkbox:checked').length > 0;
+      actionRow.style.display = anyChecked ? 'flex' : 'none';
+      if (!anyChecked) {
+        const selBtn = actionRow.querySelector('button');
+        if (selBtn) selBtn.textContent = 'Select All';
+      }
+    };
+
+    window.toggleSelectAll = function(btn) {
+      const container = btn.closest('.series-card') || btn.closest('[id]') || btn.parentElement.parentElement.parentElement;
+      const boxes = container.querySelectorAll('.dl-checkbox');
+      const allChecked = Array.from(boxes).every(b => b.checked);
+      boxes.forEach(b => b.checked = !allChecked);
+      btn.textContent = allChecked ? 'Select All' : 'Deselect All';
+    };
+
+    window.downloadSelected = function(btn) {
+      const container = btn.closest('.series-card') || btn.closest('[id]') || btn.parentElement.parentElement.parentElement;
+      const boxes = Array.from(container.querySelectorAll('.dl-checkbox:checked'));
+      if (boxes.length === 0) {
+        alert('Please select at least one chapter.');
+        return;
+      }
+      boxes.forEach((box, index) => {
+        setTimeout(() => {
+          const a = document.createElement('a');
+          a.href = box.value;
+          a.download = '';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }, index * 600);
+      });
+    };
+
+    // --- Batch Import Logic ---
+    let queuePollInterval = null;
+
+    window.toggleRangeUI = function() {
+      const cb = document.getElementById("autoRange");
+      const settings = document.getElementById("rangeSettings");
+      if (settings) settings.style.display = cb.checked ? "flex" : "none";
+    };
+
+    window.startBatchImport = async function() {
+      let raw = document.getElementById("batchUrls").value;
+      
+      const isRange = document.getElementById("autoRange") && document.getElementById("autoRange").checked;
+      if (isRange) {
+        const start = parseInt(document.getElementById("rangeStart").value) || 1;
+        const end = parseInt(document.getElementById("rangeEnd").value) || 1;
+        if (end < start) return alert("End chapter must be greater than Start.");
+        
+        let firstUrl = raw.trim().split(/[\n,\s]+/)[0];
+        if (!firstUrl) return alert("Paste at least one URL (e.g. .../c001).");
+        
+        let baseUrl = firstUrl.replace(/\/c\d+.*$/, "");
+        baseUrl = baseUrl.replace(/\/+/g, '/'); // fix double slashes in base
+        
+        raw = "";
+        for (let i = start; i <= end; i++) {
+          let chNum = i.toString().padStart(3, "0");
+          raw += baseUrl + "/c" + chNum + "\n";
+        }
+      }
+      
+      const urls = raw.split("\n").map(u => u.trim()).filter(Boolean);
+      
+      if (urls.length === 0) {
+        alert("Please paste at least one URL.");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/import/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById("batchUrls").value = "";
+          document.getElementById("queueContainer").style.display = "block";
+          pollQueue();
+        } else {
+          alert("Error: " + data.error);
+        }
+      } catch (e) {
+        alert("Network error: " + e.message);
+      }
+    };
+
+    window.clearQueue = async function() {
+      await fetch("/api/import/clear", { method: "POST" });
+      pollQueue();
+      loadLibrary(); // Refresh library after clearing
+    };
+
+    async function pollQueue() {
+      if (queuePollInterval) clearInterval(queuePollInterval);
+      
+      const fetchStatus = async () => {
+        try {
+          const res = await fetch("/api/import/status");
+          const jobs = await res.json();
+          
+          if (jobs.length === 0) {
+            document.getElementById("queueContainer").style.display = "none";
+            return;
+          }
+
+          document.getElementById("queueContainer").style.display = "block";
+          
+          const list = document.getElementById("queueList");
+          // ZIP tracking logic
+          window._completedPdfs = jobs.filter(j => j.status === "success" && j.pdf).map(j => j.pdf);
+          const zipBtn = document.getElementById("zipBtn");
+          const downloadAllBtn = document.getElementById("downloadAllBtn");
+          if (window._completedPdfs.length > 0) {
+            if (zipBtn) zipBtn.style.display = "inline-flex";
+            if (downloadAllBtn) downloadAllBtn.style.display = "none";
+          } else {
+            if (zipBtn) zipBtn.style.display = "none";
+            if (downloadAllBtn) downloadAllBtn.style.display = "inline-flex";
+          }
+
+          list.innerHTML = jobs.map(j => {
+            let colorClass = "text-muted";
+            let iconClass = "icon-wait";
+            if (j.status === "processing") { colorClass = "text-warning"; iconClass = "icon-load"; }
+            if (j.status === "success") { colorClass = "text-success"; iconClass = "icon-done"; }
+            if (j.status === "error") { colorClass = "text-danger"; iconClass = "icon-fail"; }
+            
+            return `
+              <div class="queue-item">
+                <div class="queue-icon ${iconClass}"></div>
+                <div class="queue-content">
+                  <div class="queue-url">${j.url}</div>
+                  <div class="queue-status ${colorClass}">${j.message || j.status}</div>
+                </div>
+              </div>
+            `;
+          }).join("");
+
+          // If any job just finished, refresh library
+          const hasSuccess = jobs.some(j => j.status === "success");
+          if (hasSuccess && !window._batchRefreshed) {
+             loadLibrary();
+             window._batchRefreshed = true;
+          }
+          if (!hasSuccess) window._batchRefreshed = false;
+
+        } catch (e) {
+          console.error("Queue poll error:", e);
+        }
+      };
+
+      await fetchStatus();
+      queuePollInterval = setInterval(fetchStatus, 2000); // Poll every 2 seconds
+    }
+
+
+    window.deleteChapter = async function(id, pdf, btn) {
+      if (!confirm("Delete this chapter? PDF and images will be permanently removed.")) return;
+      btn.textContent = "Deleting...";
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, pdf })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadLibrary();
+        } else {
+          alert("Error: " + data.error);
+          btn.textContent = "Delete";
+          btn.disabled = false;
+        }
+      } catch (e) {
+        alert("Network error: " + e.message);
+        btn.textContent = "Delete";
+        btn.disabled = false;
+      }
+    };
+
+    window.downloadBatchZip = async function() {
+      if (!window._completedPdfs || window._completedPdfs.length === 0) {
+        return alert("No completed chapters to zip.");
+      }
+      const btn = document.getElementById("zipBtn");
+      const originalText = btn.innerHTML;
+      btn.innerHTML = "Zipping...";
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/zip", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ pdfs: window._completedPdfs, name: "MangaVault_Batch" })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const a = document.createElement("a");
+          a.href = data.zip;
+          a.download = "";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } else {
+          alert("Error: " + data.error);
+        }
+      } catch(e) {
+        alert("Failed: " + e.message);
+      }
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    };
+</script>
+
+
+  <!-- Typing Ninja Game -->
+  <section id="arcade" style="display: none; flex-direction: column; padding: 16px; margin-top: 16px; max-width: 900px; margin-left: auto; margin-right: auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h2 style="margin: 0; font-size: 24px; color: #fff;">🎮 Typing Ninja</h2>
+      <span id="ninjaScore" style="font-size: 16px; color: #4ade80; font-weight: bold;">Score: 0</span>
+    </div>
+    <div id="ninjaArena" style="height: 320px; position: relative; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid rgba(138,43,226,0.4);"></div>
+    <input id="ninjaInput" type="text" placeholder="Type the word..." autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" style="width: 100%; margin-top: 12px; padding: 14px 16px; border-radius: 12px; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(138,43,226,0.4); box-sizing: border-box; outline: none; font-family: monospace; font-size: 16px;">
+  </section>
+
+</body>
+</html>

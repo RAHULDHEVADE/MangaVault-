@@ -1,0 +1,94 @@
+// ── Simplest Typing Ninja ──
+// Words fall. Type them. They disappear. Score +10. That's it.
+
+let ninjaActive = false;
+let ninjaWords = [];
+let ninjaScore = 0;
+
+const wordList = ["KAPOW","NANI","SHONEN","PANEL","INK","BOSS","SLASH","SUGOI","MANGA","STORY","HERO"];
+
+function startNinja() {
+  if (ninjaActive) return;
+  ninjaActive = true;
+  ninjaWords = [];
+  ninjaScore = 0;
+
+  const arena = document.getElementById("ninjaArena");
+  const input = document.getElementById("ninjaInput");
+  const scoreEl = document.getElementById("ninjaScore");
+  if (!arena || !input) { console.error("Ninja elements missing"); return; }
+
+  arena.innerHTML = "";
+  arena.style.background = "#0a0512";
+  if (scoreEl) scoreEl.textContent = "Score: 0";
+  input.value = "";
+  setTimeout(() => input.focus(), 100);
+
+  // Spawn a word every 1.6 seconds
+  setInterval(() => {
+    if (!ninjaActive) return;
+    const word = wordList[Math.floor(Math.random() * wordList.length)];
+    const el = document.createElement("div");
+    el.textContent = word;
+    el.style.position = "absolute";
+    el.style.left = (Math.random() * 60 + 20) + "%";
+    el.style.top = "0px";
+    el.style.padding = "8px 16px";
+    el.style.background = "#fff";
+    el.style.color = "#000";
+    el.style.borderRadius = "6px";
+    el.style.fontFamily = "monospace";
+    el.style.fontWeight = "bold";
+    el.style.fontSize = "18px";
+    el.dataset.word = word;
+    el.dataset.top = 0;
+    arena.appendChild(el);
+    ninjaWords.push(el);
+  }, 1600);
+
+  // Fall each frame
+  setInterval(() => {
+    if (!ninjaActive) return;
+    for (let i = ninjaWords.length - 1; i >= 0; i--) {
+      const el = ninjaWords[i];
+      let top = parseFloat(el.dataset.top) + 2;
+      el.dataset.top = top;
+      el.style.top = top + "px";
+      if (top > 260) {
+        el.remove();
+        ninjaWords.splice(i, 1);
+      }
+    }
+  }, 50);
+
+  // Type to destroy
+  input.oninput = (e) => {
+    const val = (e.target.value || "").toUpperCase().trim();
+    if (!val) return;
+    const idx = ninjaWords.findIndex(el => el.dataset.word === val);
+    if (idx !== -1) {
+      ninjaWords[idx].remove();
+      ninjaWords.splice(idx, 1);
+      ninjaScore += 10;
+      if (scoreEl) scoreEl.textContent = "Score: " + ninjaScore;
+      e.target.value = "";
+    }
+  };
+}
+
+// Auto-start when #arcade tab is opened
+window.addEventListener("hashchange", () => {
+  if (window.location.hash === "#arcade") {
+    const arcade = document.getElementById("arcade");
+    if (arcade) arcade.style.display = "flex";
+    startNinja();
+  }
+});
+
+if (window.location.hash === "#arcade") {
+  setTimeout(() => {
+    const arcade = document.getElementById("arcade");
+    if (arcade) arcade.style.display = "flex";
+    startNinja();
+  }, 200);
+}

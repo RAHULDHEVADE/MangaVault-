@@ -1,12 +1,14 @@
-// ==========================================
-// MANGAVAULT ARCADE - TYPING NINJA STEP 1
-// Basic falling words + typing + score
-// ==========================================
+// =====================================================
+// MANGAVAULT — TYPING NINJA
+// Real spinning projectile + bubble impact
+// =====================================================
 
 const arcadeNinjaState = {
     active: false,
     words: [],
+    projectiles: new Set(),
     score: 0,
+    lives: 3,
     spawnTimer: null,
     fallTimer: null
 };
@@ -14,116 +16,535 @@ const arcadeNinjaState = {
 const arcadeWordList = [
     "KAPOW", "NANI", "SHONEN", "PANEL",
     "INK", "BOSS", "SLASH", "SUGOI",
-    "MANGA", "STORY", "HERO", "NINJA"
+    "MANGA", "STORY", "HERO", "NINJA",
+    "SENPAI", "KATANA", "CHIBI", "BANKAI",
+    "SENSEI", "KAWAII", "OTAKU", "SHADOW"
 ];
+
+// -----------------------------------------------------
+// STYLES
+// -----------------------------------------------------
+
+function installNinjaStyles() {
+    if (document.getElementById("arcadeNinjaStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "arcadeNinjaStyles";
+
+    style.textContent = `
+        @keyframes ninjaWordPop {
+            0% { transform:scale(1); opacity:1; }
+            100% { transform:scale(1.6); opacity:0; }
+        }
+
+        @keyframes ninjaImpactBurst {
+            0% { transform:scale(.2); opacity:1; }
+            100% { transform:scale(2.2); opacity:0; }
+        }
+
+        .ninja-word-pop {
+            animation:ninjaWordPop .18s ease-out forwards;
+            pointer-events:none;
+        }
+
+        .ninja-impact {
+            position:absolute;
+            width:48px;
+            height:48px;
+            border:3px solid #d8a2ff;
+            border-radius:50%;
+            box-shadow:0 0 18px #b44cff, inset 0 0 12px #b44cff;
+            pointer-events:none;
+            z-index:1000;
+            animation:ninjaImpactBurst .25s ease-out forwards;
+        }
+
+        .ninja-game-over {
+            position:absolute;
+            inset:0;
+            z-index:10000;
+            display:flex;
+            flex-direction:column;
+            justify-content:center;
+            align-items:center;
+            gap:14px;
+            background:rgba(8,3,20,.94);
+            color:white;
+            text-align:center;
+            border-radius:12px;
+            padding:20px;
+            box-sizing:border-box;
+        }
+
+        .ninja-game-over h2 {
+            color:#d8a2ff;
+            font-size:30px;
+            margin:0;
+        }
+
+        .ninja-retry {
+            background:#8425dc;
+            color:white;
+            border:1px solid #c58aff;
+            padding:12px 30px;
+            border-radius:10px;
+            font-weight:bold;
+            font-size:16px;
+            cursor:pointer;
+        }
+
+        .ninja-heart-display {
+            font-size:20px;
+            margin-left:12px;
+        }
+    `;
+
+    document.head.appendChild(style);
+}
+
+// -----------------------------------------------------
+// ARENA
+// -----------------------------------------------------
+
+function setupArcadeNinja() {
+    const arena = document.getElementById("arcadeNinjaArena");
+    const input = document.getElementById("arcadeNinjaInput");
+    const score = document.getElementById("arcadeNinjaScore");
+
+    if (!arena || !input || !score) {
+        console.error("Typing Ninja: Required elements missing");
+        return null;
+    }
+
+    installNinjaStyles();
+
+    arena.style.position = "relative";
+    arena.style.overflow = "hidden";
+    arena.style.background =
+        "url('/assets/typing-bg.png') no-repeat center center";
+    arena.style.backgroundSize = "cover";
+
+    let lives = document.getElementById("arcadeNinjaLives");
+
+    if (!lives) {
+        lives = document.createElement("span");
+        lives.id = "arcadeNinjaLives";
+        lives.className = "ninja-heart-display";
+        score.insertAdjacentElement("afterend", lives);
+    }
+
+    return { arena, input, score, lives };
+}
+
+// -----------------------------------------------------
+// HUD
+// -----------------------------------------------------
+
+function updateNinjaLives() {
+    const lives = document.getElementById("arcadeNinjaLives");
+    if (!lives) return;
+
+    lives.textContent =
+        "❤️".repeat(arcadeNinjaState.lives) +
+        "🖤".repeat(3 - arcadeNinjaState.lives);
+}
+
+function updateNinjaScore() {
+    const score = document.getElementById("arcadeNinjaScore");
+    if (score) {
+        score.textContent = "Score: " + arcadeNinjaState.score;
+    }
+}
+
+// -----------------------------------------------------
+// SPAWN WORD
+// -----------------------------------------------------
+
+function spawnArcadeWord() {
+    const state = arcadeNinjaState;
+    if (!state.active) return;
+
+    const arena = document.getElementById("arcadeNinjaArena");
+    if (!arena) return;
+
+    const word =
+        arcadeWordList[
+            Math.floor(Math.random() * arcadeWordList.length)
+        ];
+
+    const element = document.createElement("div");
+
+    element.textContent = word;
+    element.dataset.word = word;
+    element.dataset.top = "0";
+    element.dataset.targeted = "false";
+
+    element.style.cssText = `
+        position:absolute;
+        top:0;
+        left:0;
+        padding:8px 16px;
+        background:white;
+        color:#111;
+        border:2px solid #171020;
+        border-radius:12px;
+        font-family:"Comic Sans MS",cursive;
+        font-size:17px;
+        font-weight:bold;
+        letter-spacing:1px;
+        white-space:nowrap;
+        box-shadow:4px 4px 0 #8b35d5,
+                   0 0 14px rgba(190,100,255,.5);
+        z-index:10;
+    `;
+
+    arena.appendChild(element);
+
+    const maxLeft = Math.max(
+        0,
+        arena.clientWidth - element.offsetWidth - 8
+    );
+
+    element.style.left =
+        Math.round(Math.random() * maxLeft) + "px";
+
+    state.words.push(element);
+}
+
+// -----------------------------------------------------
+// PURPLE IMPACT EFFECT
+// -----------------------------------------------------
+
+function createNinjaImpact(x, y) {
+    const arena = document.getElementById("arcadeNinjaArena");
+    if (!arena) return;
+
+    const impact = document.createElement("div");
+    impact.className = "ninja-impact";
+
+    impact.style.left = (x - 24) + "px";
+    impact.style.top = (y - 24) + "px";
+
+    arena.appendChild(impact);
+
+    setTimeout(() => impact.remove(), 280);
+}
+
+// -----------------------------------------------------
+// REAL SHURIKEN PROJECTILE
+// Starts bottom-centre and flies to the bubble.
+// Position updated directly on every animation frame.
+// -----------------------------------------------------
+
+function launchArcadeShuriken(targetElement, wordIndex) {
+    const state = arcadeNinjaState;
+    const arena = document.getElementById("arcadeNinjaArena");
+
+    if (!state.active || !arena || !targetElement) return;
+
+    // Prevent typing the same bubble twice.
+    if (targetElement.dataset.targeted === "true") return;
+
+    targetElement.dataset.targeted = "true";
+
+    const startX = arena.clientWidth / 2;
+    const startY = arena.clientHeight - 32;
+
+    const endX =
+        targetElement.offsetLeft + targetElement.offsetWidth / 2;
+
+    const endY =
+        targetElement.offsetTop + targetElement.offsetHeight / 2;
+
+    const shuriken = document.createElement("img");
+
+    shuriken.src = "/assets/shuriken.png";
+    shuriken.alt = "";
+
+    shuriken.style.cssText = `
+        position:absolute;
+        width:60px;
+        height:60px;
+        left:${startX - 30}px;
+        top:${startY - 30}px;
+        z-index:99999;
+        pointer-events:none;
+        object-fit:contain;
+        filter:drop-shadow(0 0 8px #b44cff);
+        will-change:left,top,transform;
+    `;
+
+    arena.appendChild(shuriken);
+
+    const projectile = {
+        element: shuriken,
+        raf: null,
+        target: targetElement
+    };
+
+    state.projectiles.add(projectile);
+
+    const duration = 280;
+    const startTime = performance.now();
+    const totalRotation = 1080; // Three complete rotations.
+
+    function animateProjectile(now) {
+        if (!state.active) {
+            shuriken.remove();
+            state.projectiles.delete(projectile);
+            return;
+        }
+
+        const progress = Math.min(
+            (now - startTime) / duration,
+            1
+        );
+
+        // Smooth acceleration towards the target.
+        const eased = 1 - Math.pow(1 - progress, 2);
+
+        const currentX =
+            startX + (endX - startX) * eased;
+
+        const currentY =
+            startY + (endY - startY) * eased;
+
+        const rotation = totalRotation * progress;
+
+        // Instant position update. No CSS position transition.
+        shuriken.style.left = (currentX - 30) + "px";
+        shuriken.style.top = (currentY - 30) + "px";
+        shuriken.style.transform = `rotate(${rotation}deg)`;
+
+        if (progress < 1) {
+            projectile.raf = requestAnimationFrame(
+                animateProjectile
+            );
+            return;
+        }
+
+        // IMPACT!
+        shuriken.remove();
+        state.projectiles.delete(projectile);
+
+        if (!state.active) return;
+
+        createNinjaImpact(endX, endY);
+
+        const index = state.words.indexOf(targetElement);
+
+        if (index !== -1) {
+            state.words.splice(index, 1);
+        }
+
+        targetElement.classList.add("ninja-word-pop");
+
+        state.score += 10;
+        updateNinjaScore();
+
+        setTimeout(() => targetElement.remove(), 200);
+    }
+
+    projectile.raf = requestAnimationFrame(animateProjectile);
+}
+
+// -----------------------------------------------------
+// INPUT
+// -----------------------------------------------------
+
+function setupNinjaInput(input) {
+    input.disabled = false;
+
+    input.oninput = function () {
+        const state = arcadeNinjaState;
+
+        if (!state.active) return;
+
+        const value = input.value.toUpperCase().trim();
+        if (!value) return;
+
+        const target = state.words.find(element =>
+            element.dataset.word === value &&
+            element.dataset.targeted !== "true"
+        );
+
+        if (target) {
+            const index = state.words.indexOf(target);
+
+            launchArcadeShuriken(target, index);
+
+            input.value = "";
+        }
+    };
+}
+
+// -----------------------------------------------------
+// FALLING WORDS
+// -----------------------------------------------------
+
+function fallArcadeWords() {
+    const state = arcadeNinjaState;
+
+    if (!state.active) return;
+
+    const arena = document.getElementById("arcadeNinjaArena");
+    if (!arena) return;
+
+    for (let i = state.words.length - 1; i >= 0; i--) {
+        const element = state.words[i];
+
+        // Freeze a bubble while its shuriken is travelling.
+        if (element.dataset.targeted === "true") continue;
+
+        const top = Number(element.dataset.top) + 2;
+
+        element.dataset.top = String(top);
+        element.style.top = top + "px";
+
+        if (top + element.offsetHeight >= arena.clientHeight) {
+            element.remove();
+            state.words.splice(i, 1);
+            loseNinjaLife();
+        }
+    }
+}
+
+// -----------------------------------------------------
+// HEARTS
+// -----------------------------------------------------
+
+function loseNinjaLife() {
+    const state = arcadeNinjaState;
+
+    if (!state.active) return;
+
+    state.lives = Math.max(0, state.lives - 1);
+    updateNinjaLives();
+
+    if (state.lives === 0) {
+        endArcadeNinja();
+    }
+}
+
+// -----------------------------------------------------
+// CLEAN UP PROJECTILES
+// -----------------------------------------------------
+
+function clearNinjaProjectiles() {
+    const state = arcadeNinjaState;
+
+    for (const projectile of state.projectiles) {
+        if (projectile.raf !== null) {
+            cancelAnimationFrame(projectile.raf);
+        }
+
+        projectile.element.remove();
+    }
+
+    state.projectiles.clear();
+}
+
+// -----------------------------------------------------
+// GAME OVER
+// -----------------------------------------------------
+
+function endArcadeNinja() {
+    const state = arcadeNinjaState;
+
+    if (!state.active) return;
+
+    state.active = false;
+
+    clearInterval(state.spawnTimer);
+    clearInterval(state.fallTimer);
+
+    state.spawnTimer = null;
+    state.fallTimer = null;
+
+    clearNinjaProjectiles();
+
+    state.words.forEach(word => word.remove());
+    state.words = [];
+
+    const arena = document.getElementById("arcadeNinjaArena");
+    const input = document.getElementById("arcadeNinjaInput");
+
+    if (input) {
+        input.disabled = true;
+        input.value = "";
+    }
+
+    if (!arena) return;
+
+    const overlay = document.createElement("div");
+    overlay.className = "ninja-game-over";
+
+    overlay.innerHTML = `
+        <div style="font-size:48px;">💀</div>
+        <h2>GAME OVER</h2>
+        <div style="font-size:20px;">🖤🖤🖤</div>
+        <p>Final Score: <strong>${state.score}</strong></p>
+        <button class="ninja-retry" type="button">↻ Retry</button>
+    `;
+
+    arena.appendChild(overlay);
+
+    overlay.querySelector(".ninja-retry").addEventListener(
+        "click",
+        startArcadeNinja
+    );
+}
+
+// -----------------------------------------------------
+// START / RETRY
+// -----------------------------------------------------
 
 function startArcadeNinja() {
     const state = arcadeNinjaState;
 
     if (state.active) return;
 
-    const arena = document.getElementById("arcadeNinjaArena");
-    const input = document.getElementById("arcadeNinjaInput");
-    const scoreEl = document.getElementById("arcadeNinjaScore");
+    const elements = setupArcadeNinja();
+    if (!elements) return;
 
-    if (!arena || !input || !scoreEl) {
-        console.error("Typing Ninja: Required elements missing");
-        return;
-    }
+    const { arena, input, score } = elements;
 
-    state.active = true;
+    clearInterval(state.spawnTimer);
+    clearInterval(state.fallTimer);
+    clearNinjaProjectiles();
+
+    state.words.forEach(word => word.remove());
     state.words = [];
+
+    const oldOverlay = arena.querySelector(".ninja-game-over");
+    if (oldOverlay) oldOverlay.remove();
+
     state.score = 0;
+    state.lives = 3;
+    state.active = true;
 
-    arena.innerHTML = "";
-    arena.style.position = "relative";
-    arena.style.overflow = "hidden";
-    arena.style.background = "#0a0512";
+    score.textContent = "Score: 0";
 
-    scoreEl.textContent = "Score: 0";
+    updateNinjaLives();
+    setupNinjaInput(input);
+
+    spawnArcadeWord();
+
+    state.spawnTimer = setInterval(spawnArcadeWord, 1600);
+    state.fallTimer = setInterval(fallArcadeWords, 50);
+
     input.value = "";
-
-    input.oninput = function () {
-        const value = input.value.toUpperCase().trim();
-
-        if (!value) return;
-
-        const index = state.words.findIndex(
-            word => word.dataset.word === value
-        );
-
-        if (index === -1) return;
-
-        state.words[index].remove();
-        state.words.splice(index, 1);
-
-        state.score += 10;
-        scoreEl.textContent = "Score: " + state.score;
-
-        input.value = "";
-    };
-
-    function spawnWord() {
-        if (!state.active) return;
-
-        const word = arcadeWordList[
-            Math.floor(Math.random() * arcadeWordList.length)
-        ];
-
-        const element = document.createElement("div");
-
-        element.textContent = word;
-        element.dataset.word = word;
-        element.dataset.top = "0";
-
-        element.style.cssText = `
-            position: absolute;
-            top: 0px;
-            left: ${Math.random() * Math.max(0, arena.clientWidth - 130)}px;
-            padding: 9px 16px;
-            background: white;
-            color: black;
-            border: 2px solid black;
-            border-radius: 12px;
-            font-family: Comic Sans MS, cursive;
-            font-size: 17px;
-            font-weight: bold;
-            z-index: 5;
-        `;
-
-        arena.appendChild(element);
-        state.words.push(element);
-    }
-
-    function fallWords() {
-        if (!state.active) return;
-
-        for (let i = state.words.length - 1; i >= 0; i--) {
-            const element = state.words[i];
-
-            let top = Number(element.dataset.top) + 2;
-
-            element.dataset.top = String(top);
-            element.style.top = top + "px";
-
-            if (top > arena.clientHeight - 35) {
-                element.remove();
-                state.words.splice(i, 1);
-            }
-        }
-    }
-
-    spawnWord();
-
-    state.spawnTimer = setInterval(spawnWord, 1600);
-    state.fallTimer = setInterval(fallWords, 50);
 
     setTimeout(() => {
         if (state.active) input.focus();
-    }, 100);
+    }, 150);
 
-    console.log("Typing Ninja started");
+    console.log("Typing Ninja started!");
 }
+
+// -----------------------------------------------------
+// STOP / NAVIGATION
+// -----------------------------------------------------
 
 function stopArcadeNinja() {
     const state = arcadeNinjaState;
@@ -135,12 +556,26 @@ function stopArcadeNinja() {
 
     state.spawnTimer = null;
     state.fallTimer = null;
+
+    clearNinjaProjectiles();
+
+    state.words.forEach(word => word.remove());
     state.words = [];
+
+    const input = document.getElementById("arcadeNinjaInput");
+
+    if (input) {
+        input.value = "";
+        input.disabled = false;
+    }
 }
+
+// -----------------------------------------------------
+// NAVIGATION
+// -----------------------------------------------------
 
 function handleArcadeNavigation() {
     const arcade = document.getElementById("arcade");
-
     if (!arcade) return;
 
     if (window.location.hash === "#arcade") {
@@ -160,3 +595,4 @@ window.addEventListener("hashchange", handleArcadeNavigation);
 document.addEventListener("DOMContentLoaded", handleArcadeNavigation);
 
 handleArcadeNavigation();
+
