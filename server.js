@@ -279,7 +279,11 @@ async function withDownloadSlot(chapterId, task) {
 }
 
 app.use(express.json({ limit: "1mb" }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use((req, res, next) => {
+  // Let /api/* requests bypass static middleware
+  if (req.path.startsWith("/api/")) return next();
+  return express.static(path.join(__dirname, "public"))(req, res, next);
+});
 
 const REFERER = "https://m.mangatown.com/";
 const USER_AGENT = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
@@ -445,6 +449,250 @@ async function downloadImage(url, savePath, retries = 3, chapterId) {
     }
   }
 }
+
+// --- MangaVault: Manga Search & Discovery ---
+const MANGATOWN_BASE = "https://m.mangatown.com";
+
+console.log("[DEBUG] Registering /api/search/manga route");
+app.get("/api/search/manga", async (req, res) => {
+  try {
+    const query = String(req.query.q || "").trim();
+
+    if (query.length < 2 || query.length > 100) {
+      return res.status(400).json({
+        success: false,
+        error: "Enter a manga name between 2 and 100 characters."
+      });
+    }
+
+    const searchUrl = MANGATOWN_BASE + "/search?name=" + encodeURIComponent(query);
+    const response = await fetchUrl(searchUrl);
+
+    if (response.status !== 200 || !response.text) {
+      return res.status(502).json({
+        success: false,
+        error: "MangaTown search is temporarily unavailable."
+      });
+    }
+
+    const html = response.text;
+    const results = [];
+
+    const cards = html.match(/<li\b[^>]*>[\s\S]*?<\/li>/gi) || [];
+
+    for (const card of cards) {
+      const cover = card.match(
+        /<a\b[^>]*class=["'][^"']*\bmanga-cover\b[^"']*["'][^>]*>/i
+      );
+
+      if (!cover) continue;
+
+      const href = cover[0].match(/\bhref=["']([^"']+)["']/i);
+      const rel = cover[0].match(/\brel=["']([^"']+)["']/i);
+      const image = card.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i);
+      const title = card.match(/<p\b[^>]*class=["']title["'][^>]*>([\s\S]*?)<\/p>/i);
+      const latest = card.match(
+        /<a\b[^>]*class=["'][^"']*\bread-btn\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/i
+      );
+
+      if (!href) continue;
+
+      const mangaPath = href[1];
+
+      if (!/^\/manga\/[a-z0-9_-]+\/?$/i.test(mangaPath)) continue;
+
+      const cleanText = value => value
+        ? value.replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&")
+            .replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"')
+            .replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim()
+        : "";
+
+      const mangaTitle = cleanText(title && title[1]) || (rel && cleanText(rel[1]));
+
+      if (!mangaTitle) continue;
+
+      const mangaId = mangaPath.replace(/^\/manga\//, "").replace(/\/$/, "");
+
+      results.push({
+        id: mangaId,
+        title: mangaTitle,
+        url: MANGATOWN_BASE + "/manga/" + mangaId,
+        cover: image ? image[1] : null,
+        latestChapter: cleanText(latest && latest[1])
+      });
+    }
+
+    const unique = [...new Map(results.map(item => [item.id, item])).values()];
+
+    res.json({
+      success: true,
+      query,
+      count: unique.length,
+      results: unique
+    });
+  } catch (err) {
+    console.error("[MANGA SEARCH]", err.message);
+    res.status(500).json({
+      success: false,
+      error: "Manga search failed."
+    });
+  }
+});
+
+app.get("/api/search/manga/:id/chapters", async (req, res) => {
+  try {
+    const id = String(req.params.id || "");
+
+    if (!/^[a-z0-9_-]{1,150}$/i.test(id)) {
+      return res.status(400).json({ success: false, error: "Invalid manga ID." });
+    }
+
+    const seriesUrl = MANGATOWN_BASE + "/manga/" + id;
+    const response = await fetchUrl(seriesUrl);
+
+    if (response.status !== 200 || !response.text) {
+      return res.status(502).json({
+        success: false,
+        error: "Could not load this manga's chapter list."
+      });
+    }
+
+    const html = response.text;
+    const licensed = /has been licensed|not available in MangaTown/i.test(html);
+
+    const titleMatch = html.match(
+      /<div\b[^>]*class=["']title["'][^>]*>([\s\S]*?)<\/div>/i
+    );
+
+    const coverMatch = html.match(
+      /<img\b[^>]*class=["']detail-cover["'][^>]*\bsrc=["']([^"']+)["']/i
+    );
+
+    const listMatch = html.match(
+      /<ul\b[^>]*class=["']detail-ch-list["'][^>]*>([\s\S]*?)<\/ul>/i
+    );
+
+    const chapters = [];
+
+    if (!licensed && listMatch) {
+      const links = listMatch[1].matchAll(
+        /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
+      );
+
+      for (const match of links) {
+        const chapterPath = match[1];
+
+        if (!/^\/manga\/[a-z0-9_-]+\/c[\w.-]+\/?$/i.test(chapterPath)) {
+          continue;
+        }
+
+        const content = match[2];
+        const label = content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+        const numberMatch = chapterPath.match(/\/c(\d+(?:\.\d+)?)/i);
+
+        if (!numberMatch) continue;
+
+        const dateMatch = content.match(
+          /class=["']time["'][^>]*>([\s\S]*?)<\/span>/i
+        );
+
+        chapters.push({
+          number: Number(numberMatch[1]),
+          label: label.split(/\s+/)[0] || ("Chapter " + numberMatch[1]),
+          date: dateMatch
+            ? dateMatch[1].replace(/<[^>]*>/g, "").trim()
+            : "",
+          url: new URL(chapterPath, MANGATOWN_BASE).href
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      id,
+      title: titleMatch
+        ? titleMatch[1].replace(/<[^>]*>/g, "").trim()
+        : id,
+      cover: coverMatch ? coverMatch[1] : null,
+      licensed,
+      available: !licensed && chapters.length > 0,
+      chapterCount: chapters.length,
+      chapters
+    });
+  } catch (err) {
+    console.error("[MANGA CHAPTERS]", err.message);
+    res.status(500).json({
+      success: false,
+      error: "Could not retrieve chapters."
+    });
+  }
+});
+
+app.post("/api/search/download", (req, res) => {
+  const urls = req.body && req.body.urls;
+
+  if (!Array.isArray(urls) || urls.length === 0 || urls.length > 100) {
+    return res.status(400).json({
+      success: false,
+      error: "Select between 1 and 100 chapters."
+    });
+  }
+
+  const validUrls = [...new Set(urls.filter(url => {
+    if (typeof url !== "string") return false;
+
+    try {
+      const parsed = new URL(url);
+      return (
+        parsed.hostname === "m.mangatown.com" &&
+        /^\/manga\/[a-z0-9_-]+\/c[\w.-]+\/?$/i.test(parsed.pathname)
+      );
+    } catch (_) {
+      return false;
+    }
+  }))];
+
+  if (validUrls.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: "No valid MangaTown chapter URLs were selected."
+    });
+  }
+
+  const queued = [];
+
+  for (const url of validUrls) {
+    const alreadyQueued = Object.values(importJobs).some(job =>
+      job.url.replace(/\/+$/, "") === url.replace(/\/+$/, "") &&
+      ["pending", "processing"].includes(job.status)
+    );
+
+    if (alreadyQueued) continue;
+
+    const id = Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+
+    importJobs[id] = {
+      id,
+      url,
+      status: "pending",
+      message: "In queue..."
+    };
+
+    importQueue.push({ id, url });
+    queued.push(id);
+  }
+
+  processQueue();
+
+  res.json({
+    success: true,
+    queued: queued.length,
+    skipped: validUrls.length - queued.length,
+    jobs: queued
+  });
+});
+// --- End Manga Search & Discovery ---
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "online", app: "MangaVault" });
 });
