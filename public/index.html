@@ -562,6 +562,12 @@
           <h2>▥ &nbsp;Your Library</h2>
           <span id="seriesCount">0 series</span>
         </div>
+        <div style="margin:14px 0;">
+          <input id="librarySeriesSearch" type="search"
+            placeholder="Search series..."
+            oninput="filterLibrarySeries(this.value)"
+            style="width:100%;box-sizing:border-box;padding:13px 15px;border-radius:12px;background:#171020;color:#fff;border:1px solid #7545a5;font-size:14px;">
+        </div>
         <div id="seriesGrid" class="series-grid">
           <div class="empty-library">
             <div class="empty-copy">
@@ -784,7 +790,33 @@
               <option value="desc" ${window.librarySortOrder === "desc" ? "selected" : ""}>Descending ↓</option>
               <option value="asc" ${window.librarySortOrder === "asc" ? "selected" : ""}>Ascending ↑</option>
             </select>
-            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px;margin:14px 0;">
+            <input type="search" class="chapter-search"
+              placeholder="Search chapters in this series..."
+              oninput="filterLibraryChapters(this)"
+              style="width:100%;box-sizing:border-box;padding:11px 13px;border-radius:10px;background:#171020;color:#fff;border:1px solid #7545a5;">
+
+            <div style="padding:12px;border:1px solid rgba(138,43,226,.35);border-radius:12px;background:rgba(138,43,226,.07);">
+              <strong style="display:block;margin-bottom:9px;font-size:13px;">Select chapter range</strong>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <input type="number" class="range-from" min="0" placeholder="From"
+                  style="width:50%;min-width:0;box-sizing:border-box;padding:11px;border-radius:9px;background:#171020;color:#fff;border:1px solid #7545a5;">
+                <span>to</span>
+                <input type="number" class="range-to" min="0" placeholder="To"
+                  style="width:50%;min-width:0;box-sizing:border-box;padding:11px;border-radius:9px;background:#171020;color:#fff;border:1px solid #7545a5;">
+              </div>
+              <button type="button" onclick="selectChapterRange(this)"
+                style="width:100%;margin-top:10px;padding:11px;border:0;border-radius:9px;background:#7545a5;color:white;font-weight:600;">
+                Select Range
+              </button>
+              <small class="range-result" style="display:block;margin-top:8px;color:#b9adc8;">Example: 10 to 23</small>
+            </div>
+            <small class="selection-count" style="color:#c19bff;">0 chapters selected</small>
+          </div>
+
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
               <button onclick="toggleSelectAll(this)" style="padding:8px 12px; font-size:13px; border-radius:8px; background:transparent; border:1px solid #8a2be2; color:#b88aff; cursor:pointer; flex:1;">Select All</button>
               
               <button onclick="downloadSelected(this)" style="padding:8px 12px; font-size:13px; border-radius:8px; background:#8a2be2; color:white; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; flex:1;">
@@ -902,42 +934,171 @@
       }
     });
   
+    window.updateLibrarySelection = function(panel) {
+      if (!panel) return;
+      const boxes = Array.from(panel.querySelectorAll(".dl-checkbox"));
+      const selected = boxes.filter(box => box.checked).length;
+      const count = panel.querySelector(".selection-count");
+      if (count) count.textContent = selected + " chapters selected";
+    };
+
     window.toggleBulkActions = function(checkbox) {
-      const seriesCard = checkbox.closest('.series-chapter-item').parentElement.parentElement;
-      const actionRow = seriesCard.querySelector('.bulk-actions');
-      const anyChecked = seriesCard.querySelectorAll('.dl-checkbox:checked').length > 0;
-      actionRow.style.display = anyChecked ? 'flex' : 'none';
-      if (!anyChecked) {
-        const selBtn = actionRow.querySelector('button');
-        if (selBtn) selBtn.textContent = 'Select All';
-      }
+      window.updateLibrarySelection(checkbox.closest(".series-inline-panel"));
     };
 
     window.toggleSelectAll = function(btn) {
-      const container = btn.closest('.series-card') || btn.closest('[id]') || btn.parentElement.parentElement.parentElement;
-      const boxes = container.querySelectorAll('.dl-checkbox');
-      const allChecked = Array.from(boxes).every(b => b.checked);
-      boxes.forEach(b => b.checked = !allChecked);
-      btn.textContent = allChecked ? 'Select All' : 'Deselect All';
+      const panel = btn.closest(".series-inline-panel");
+      if (!panel) return;
+
+      const boxes = Array.from(panel.querySelectorAll(".dl-checkbox"));
+      const allChecked = boxes.length > 0 && boxes.every(box => box.checked);
+
+      boxes.forEach(box => {
+        box.checked = !allChecked;
+      });
+
+      btn.textContent = allChecked ? "Select All" : "Deselect All";
+      window.updateLibrarySelection(panel);
+    };
+
+    window.selectChapterRange = function(btn) {
+      const panel = btn.closest(".series-inline-panel");
+      if (!panel) return;
+
+      const from = Number(panel.querySelector(".range-from").value);
+      const to = Number(panel.querySelector(".range-to").value);
+
+      if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0) {
+        alert("Enter valid chapter numbers in both fields.");
+        return;
+      }
+
+      if (to < from) {
+        alert("End chapter must be greater than or equal to Start chapter.");
+        return;
+      }
+
+      const rows = Array.from(panel.querySelectorAll(".library-chapter-row"));
+      let selected = 0;
+
+      rows.forEach(row => {
+        const number = Number(row.dataset.chapterNumber);
+        const checkbox = row.querySelector(".dl-checkbox");
+        if (!checkbox || !Number.isFinite(number)) return;
+
+        if (number >= from && number <= to) {
+          checkbox.checked = true;
+          selected++;
+        }
+      });
+
+      window.updateLibrarySelection(panel);
+
+      const result = panel.querySelector(".range-result");
+      if (result) {
+        result.textContent = selected
+          ? selected + " available chapters selected (" + from + "–" + to + ")."
+          : "No available chapters found in this range.";
+      }
+    };
+
+    window.filterLibraryChapters = function(input) {
+      const panel = input.closest(".series-inline-panel");
+      if (!panel) return;
+
+      const query = input.value.trim().toLowerCase();
+
+      panel.querySelectorAll(".library-chapter-row").forEach(row => {
+        const label = row.querySelector("strong")?.textContent || "";
+        row.style.display = label.toLowerCase().includes(query) ? "flex" : "none";
+      });
+    };
+
+    window.filterLibrarySeries = function(value) {
+      const query = String(value || "").trim().toLowerCase();
+
+      document.querySelectorAll("#seriesGrid .series-wrapper").forEach(wrapper => {
+        const title = wrapper.querySelector(".series-info strong")?.textContent || "";
+        wrapper.style.display = title.toLowerCase().includes(query) ? "" : "none";
+      });
     };
 
     window.downloadSelected = function(btn) {
-      const container = btn.closest('.series-card') || btn.closest('[id]') || btn.parentElement.parentElement.parentElement;
-      const boxes = Array.from(container.querySelectorAll('.dl-checkbox:checked'));
+      const panel = btn.closest(".series-inline-panel");
+      if (!panel) return;
+
+      const boxes = Array.from(panel.querySelectorAll(".dl-checkbox:checked"));
+
       if (boxes.length === 0) {
-        alert('Please select at least one chapter.');
+        alert("Please select at least one chapter.");
         return;
       }
+
       boxes.forEach((box, index) => {
         setTimeout(() => {
-          const a = document.createElement('a');
+          const a = document.createElement("a");
           a.href = box.value;
-          a.download = '';
+          a.download = "";
           document.body.appendChild(a);
           a.click();
-          document.body.removeChild(a);
+          a.remove();
         }, index * 600);
       });
+    };
+
+    window.downloadSelectedZip = async function(btn) {
+      const panel = btn.closest(".series-inline-panel");
+
+      if (!panel) {
+        alert("Could not find the chapter list.");
+        return;
+      }
+
+      const boxes = Array.from(
+        panel.querySelectorAll(".dl-checkbox:checked")
+      );
+
+      if (boxes.length === 0) {
+        alert("Please select at least one chapter.");
+        return;
+      }
+
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.textContent = "Creating ZIP...";
+
+      try {
+        const pdfs = boxes.map(box => box.value);
+
+        const res = await fetch("/api/zip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pdfs,
+            name: "MangaVault_Selected_Chapters"
+          })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success || !data.zip) {
+          throw new Error(data.error || "ZIP creation failed.");
+        }
+
+        const a = document.createElement("a");
+        a.href = data.zip;
+        a.download = "MangaVault_Selected_Chapters.zip";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+      } catch (e) {
+        alert("ZIP download failed: " + e.message);
+        console.error("[ZIP] Selected chapters error:", e);
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
     };
 
     // --- Batch Import Logic ---
