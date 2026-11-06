@@ -1,10 +1,23 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+const { Agent } = require("undici");
+const { pipeline } = require("stream/promises");
+const { Readable, Transform } = require("stream");
 const https = require("https");
 const http = require("http");
-const { execSync, execFileSync } = require("child_process");
+const { execSync, execFileSync, execFile } = require("child_process");
+const { promisify } = require("util");
+const execFileAsync = promisify(execFile);
 const { detectSource } = require("./sources/registry");
+const imageDispatcher = new Agent({
+  connections: 50,
+  pipelining: 1,
+  connect: { timeout: 15000 },
+  headersTimeout: 30000,
+  bodyTimeout: 60000
+});
+
 
 // --- Global Paths ---
 const uploadsDir = path.join(__dirname, "uploads");
@@ -21,44 +34,65 @@ async function processQueue() {
   if (isProcessingQueue) return;
   isProcessingQueue = true;
 
-  while (importQueue.length > 0) {
-    const job = importQueue.shift();
-    const state = importJobs[job.id];
-    if (!state) continue;
+  async function queueWorker() {
+    while (true) {
+      const job = importQueue.shift();
+      if (!job) return;
 
-    state.status = "processing";
-    state.message = "Downloading pages...";
-    console.log("[QUEUE] Starting job:", job.url);
+      const state = importJobs[job.id];
+      if (!state) continue;
 
-    try {
-      // Re-use the internal import logic synchronously via HTTP call to self (simplest way to avoid major refactor)
-      const res = await fetch("http://127.0.0.1:" + (process.env.PORT || 3000) + "/api/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "User-Agent": "Node-Internal-Queue" },
-        body: JSON.stringify({ url: job.url })
-      });
-      
-      const data = await res.json();
-      
-      if (res.ok && data.success) {
-        state.status = "success";
-        state.message = data.message;
-        state.pages = data.pages;
-        state.pdf = data.pdf;
-      } else {
+      state.status = "processing";
+      state.message = "Downloading pages...";
+      console.log("[QUEUE] Starting job:", job.url);
+
+      try {
+        const res = await fetch(
+          "http://127.0.0.1:" + (process.env.PORT || 3000) + "/api/import",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "User-Agent": "Node-Internal-Queue"
+            },
+            body: JSON.stringify({ url: job.url })
+          }
+        );
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          state.status = "success";
+          state.message = data.message;
+          state.pages = data.pages;
+          state.pdf = data.pdf;
+        } else {
+          state.status = "error";
+          state.message = data.error || "Import failed";
+        }
+      } catch (err) {
         state.status = "error";
-        state.message = data.error || "Import failed";
+        state.message = "Network error: " + err.message;
       }
-    } catch (err) {
-      state.status = "error";
-      state.message = "Network error: " + err.message;
+
+      console.log("[QUEUE] Finished job:", job.url, "->", state.status);
     }
-    console.log("[QUEUE] Finished job:", job.url, "->", state.status);
   }
 
-  isProcessingQueue = false;
-}
+  try {
+    const chapterWorkers = Math.min(3, importQueue.length);
+    await Promise.all(
+      Array.from({ length: chapterWorkers }, () => queueWorker())
+    );
+  } finally {
+    isProcessingQueue = false;
 
+    // Catch jobs added while the previous workers were finishing.
+    if (importQueue.length > 0) {
+      processQueue();
+    }
+  }
+}
 
 // MangaVault URL metadata parser (Step 4 v2)
 // Groups by series URL (/manga/<slug>/); chapter number from trailing segment.
@@ -146,7 +180,103 @@ app.use(express.json());
 
 const PORT = 3000;
 
+
 const activeImports = new Set();
+
+// Adaptive global download scheduler.
+// Maximum 50 active image downloads, distributed by chapter size.
+const MAX_ACTIVE_DOWNLOADS = 50;
+let activeDownloadCount = 0;
+const downloadChapters = new Map();
+let dispatchScheduled = false;
+
+function scheduleDownloadDispatch() {
+  if (dispatchScheduled) return;
+  dispatchScheduled = true;
+
+  // Brief batching window lets concurrently starting chapters register.
+  setTimeout(() => {
+    dispatchScheduled = false;
+    dispatchDownloadSlots();
+  }, 25);
+}
+
+function dispatchDownloadSlots() {
+  while (activeDownloadCount < MAX_ACTIVE_DOWNLOADS) {
+    let selected = null;
+    let lowestShare = Infinity;
+
+    for (const state of downloadChapters.values()) {
+      if (!state.waiters.length || state.active >= state.limit) continue;
+
+      const share = state.active / state.weight;
+      if (share < lowestShare) {
+        lowestShare = share;
+        selected = state;
+      }
+    }
+
+    if (!selected) break;
+
+    const resolve = selected.waiters.shift();
+    selected.active++;
+    activeDownloadCount++;
+    resolve();
+  }
+
+}
+
+function getChapterDownloadWorkers(remainingTasks) {
+  return Math.min(15, Math.max(2, Math.ceil(remainingTasks / 4)));
+}
+
+function registerDownloadChapter(chapterId, totalPages) {
+  downloadChapters.set(chapterId, {
+    remainingTasks: totalPages,
+    weight: Math.max(1, totalPages),
+    limit: getChapterDownloadWorkers(totalPages),
+    active: 0,
+    waiters: []
+  });
+  scheduleDownloadDispatch();
+}
+
+function markDownloadPageComplete(chapterId) {
+  const state = downloadChapters.get(chapterId);
+  if (!state) return;
+
+  state.remainingTasks = Math.max(0, state.remainingTasks - 1);
+  state.weight = Math.max(1, state.remainingTasks);
+  state.limit = getChapterDownloadWorkers(state.remainingTasks);
+
+  // Recalculate allocation immediately after each completed page task.
+  dispatchDownloadSlots();
+}
+
+function unregisterDownloadChapter(chapterId) {
+  downloadChapters.delete(chapterId);
+  scheduleDownloadDispatch();
+}
+
+async function withDownloadSlot(chapterId, task) {
+  const state = downloadChapters.get(chapterId);
+  if (!state) {
+    throw new Error("Download chapter is not registered: " + chapterId);
+  }
+
+  await new Promise(resolve => {
+    state.waiters.push(resolve);
+    scheduleDownloadDispatch();
+  });
+
+  try {
+    return await task();
+  } finally {
+    state.active--;
+    activeDownloadCount--;
+    dispatchDownloadSlots();
+  }
+}
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -235,28 +365,86 @@ function classifyPages(urls) {
   return pages;
 }
 
-async function downloadImage(url, savePath, retries = 3) {
+async function downloadImage(url, savePath, retries = 3, chapterId) {
   for (let i = 1; i <= retries; i++) {
+    const tempPath =
+      savePath + ".part-" + process.pid + "-" + Date.now() + "-" + i;
+
     try {
-      const res = await fetchUrl(url, {
-        accept: "image/webp,image/apng,image/*,*/*;q=0.8",
-        referer: REFERER
+      const result = await withDownloadSlot(chapterId, async () => {
+        const res = await fetch(url, {
+          method: "GET",
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36",
+            "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": REFERER
+          },
+          redirect: "follow",
+          dispatcher: imageDispatcher
+        });
+
+        if (res.status !== 200) {
+          try { await res.body?.cancel(); } catch (_) {}
+          throw new Error("HTTP " + res.status);
+        }
+
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.toLowerCase().startsWith("image/")) {
+          try { await res.body?.cancel(); } catch (_) {}
+          throw new Error("Not an image");
+        }
+
+        if (!res.body) {
+          throw new Error("Empty response body");
+        }
+
+        let bytes = 0;
+
+        const counter = new Transform({
+          transform(chunk, encoding, callback) {
+            bytes += chunk.length;
+            callback(null, chunk);
+          }
+        });
+
+        await pipeline(
+          Readable.fromWeb(res.body),
+          counter,
+          fs.createWriteStream(tempPath, { flags: "wx" })
+        );
+
+        if (bytes < 1000) {
+          throw new Error("Too small");
+        }
+
+        await fs.promises.rename(tempPath, savePath);
+
+        return { success: true, size: bytes };
       });
-      if (res.status !== 200) throw new Error("HTTP " + res.status);
-      if (!res.headers["content-type"] || !res.headers["content-type"].startsWith("image/")) {
-        throw new Error("Not an image");
-      }
-      if (res.buffer.length < 1000) throw new Error("Too small");
-      fs.writeFileSync(savePath, res.buffer);
-      return { success: true, size: res.buffer.length };
+
+      return result;
+
     } catch (err) {
-      if (err.message.includes("HTTP 403") || err.message.includes("HTTP 404")) return { success: false, error: err.message };
-      if (i === retries) return { success: false, error: err.message };
-      await new Promise(r => setTimeout(r, 600 * i));
+      try {
+        await fs.promises.unlink(tempPath);
+      } catch (_) {}
+
+      if (
+        err.message.includes("HTTP 403") ||
+        err.message.includes("HTTP 404")
+      ) {
+        return { success: false, error: err.message };
+      }
+
+      if (i === retries) {
+        return { success: false, error: err.message };
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 600 * i));
     }
   }
 }
-
 app.get("/api/health", (req, res) => {
   res.json({ status: "online", app: "MangaVault" });
 });
@@ -363,8 +551,10 @@ if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
     let ok = 0;
     const failedPages = [];
 
-    // Four concurrent workers; PDF generation waits for all workers.
-    const DOWNLOAD_CONCURRENCY = 30;
+    const downloadStageStart = Date.now();
+
+    // Chapter-specific worker cap based on expected page count.
+    const DOWNLOAD_CONCURRENCY = getChapterDownloadWorkers(pages.length);
     let nextPageIndex = 0;
 
     async function downloadWorker() {
@@ -386,7 +576,7 @@ if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 
           console.log("[IMPORT] Downloading missing page: " + page.filename);
 
-          const result = await downloadImage(page.url, savePath);
+          const result = await downloadImage(page.url, savePath, 3, importKey);
 
           if (result.success) {
             ok++;
@@ -403,13 +593,27 @@ if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
           page.error = err.message;
           failedPages.push(page.filename);
           console.log("[IMPORT] Failed " + page.filename + ": " + err.message);
+        } finally {
+          markDownloadPageComplete(importKey);
         }
       }
     }
 
     const workerCount = Math.min(DOWNLOAD_CONCURRENCY, pages.length);
-    await Promise.all(
-      Array.from({ length: workerCount }, () => downloadWorker())
+    registerDownloadChapter(importKey, pages.length);
+
+    try {
+      await Promise.all(
+        Array.from({ length: workerCount }, () => downloadWorker())
+      );
+    } finally {
+      unregisterDownloadChapter(importKey);
+    }
+
+    console.log(
+      "[TIMING] Image downloads: " +
+      ((Date.now() - downloadStageStart) / 1000).toFixed(2) +
+      "s (" + ok + "/" + pages.length + " pages)"
     );
 
     const pdfName = previousManifest?.pdf
@@ -447,49 +651,70 @@ if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
       });
     }
 
-    // Generate a temporary PDF first.
+    // Generate and verify PDF asynchronously.
     const tempPdfPath = pdfPath + ".recovery.tmp.pdf";
 
     try {
-      execFileSync(
+      const generationStart = Date.now();
+
+      await execFileAsync(
         "python3",
         ["diagnostics/make-pdf.py", imageDir, tempPdfPath],
-        { stdio: "pipe", timeout: 120000 }
+        { timeout: 120000, maxBuffer: 10 * 1024 * 1024 }
       );
 
-      // Verify the PDF contains every expected page.
-      const actualCount = Number(execFileSync(
+      console.log(
+        "[IMPORT] PDF generation completed in " +
+        ((Date.now() - generationStart) / 1000).toFixed(2) + "s"
+      );
+
+      // Independently verify the PDF before replacing the previous one.
+      const verification = await execFileAsync(
         "python3",
         [
           "-c",
           "import sys; from pypdf import PdfReader; print(len(PdfReader(sys.argv[1]).pages))",
           tempPdfPath
         ],
-        { encoding: "utf8", timeout: 30000 }
-      ).trim());
+        { timeout: 30000, maxBuffer: 1024 * 1024 }
+      );
 
-      // Accept stitched PDFs where physical pages < image count.
-      // Require at least 1 page and no more than image count.
-      if (!Number.isFinite(actualCount) || actualCount < 1 || actualCount > pages.length) {
-        throw new Error("PDF verification failed: expected at most " +
-          pages.length + ", found " + actualCount);
+      const actualCount = Number(verification.stdout.trim());
+
+      if (
+        !Number.isFinite(actualCount) ||
+        actualCount < 1 ||
+        actualCount > pages.length
+      ) {
+        throw new Error(
+          "PDF verification failed: expected at most " +
+          pages.length + ", found " + actualCount
+        );
       }
-      console.log("[IMPORT] PDF verified (" + actualCount + " physical pages, " + pages.length + " source images)");
 
-      // Replace the previous PDF only after successful verification.
-      fs.renameSync(tempPdfPath, pdfPath);
+      console.log(
+        "[IMPORT] PDF verified (" + actualCount +
+        " physical pages, " + pages.length + " source images)"
+      );
 
-    // Save manifest ONLY after PDF is safely on disk
-    
-
+      // Atomically replace the previous PDF only after verification.
+      await fs.promises.rename(tempPdfPath, pdfPath);
 
     } catch (err) {
-      if (fs.existsSync(tempPdfPath)) fs.unlinkSync(tempPdfPath);
-      console.error("[IMPORT] PDF verification/generation failed:", err.message);
+      try {
+        await fs.promises.unlink(tempPdfPath);
+      } catch (_) {}
+
+      console.error(
+        "[IMPORT] PDF verification/generation failed:",
+        err.message
+      );
+
       return res.status(500).json({
         error: "PDF verification failed. Previous PDF was preserved."
       });
     }
+
     // Extract and maintain the best available series cover.
     const sourceParts = new URL(url).pathname.split("/").filter(Boolean);
     const seriesSlug = (sourceParts[sourceParts.length - 2] || "unknown-manga")
@@ -569,14 +794,13 @@ if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
       // --- AUTO CLEANUP (moved AFTER cover generation) ---
       // Delete the raw image folder to save 50% disk space.
       // (Smart Re-import will just recreate it if you ever need to rebuild).
-      try {
-        if (fs.existsSync(imageDir)) {
-          fs.rmSync(imageDir, { recursive: true, force: true });
+      fs.promises.rm(imageDir, { recursive: true, force: true })
+        .then(() => {
           console.log("[IMPORT] Cleaned up raw images to save space.");
-        }
-      } catch (cleanupErr) {
-        console.error("[IMPORT] Cleanup failed (but PDF is safe):", cleanupErr.message);
-      }
+        })
+        .catch(cleanupErr => {
+          console.error("[IMPORT] Cleanup failed (but PDF is safe):", cleanupErr.message);
+        });
       if (savedCover) {
         coverRelative = "/uploads/series/" + seriesSlug + "/" + savedCover;
       }
